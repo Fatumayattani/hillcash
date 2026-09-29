@@ -21,7 +21,9 @@ async function main() {
   const ledger = loadLedger(path);
   const issued = ledger.issue({ offerId, buyer, units, expiresAt: (Number(offer.deliveryDeadline) + 30 * 86400) * 1000 });
   try {
-    const tx = await contract.commitDelivery(offerId, buyer, issued.commitment);
+    const gasPrice = BigInt(process.env.HILLCASH_GAS_PRICE_WEI || "2000000000000");
+    const tx = await contract.commitDelivery(offerId, buyer, issued.commitment,
+      { gasLimit: 750000n, gasPrice, type: 0 });
     await tx.wait();
     saveLedger(path, ledger);
     // This CLI prints the token once. Run it only in a private terminal and deliver it through a private channel.

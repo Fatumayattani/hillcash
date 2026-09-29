@@ -14,7 +14,7 @@ describe("Sample provider and escrow integration", function () {
     now = (await ethers.provider.getBlock("latest")).timestamp;
     oracle = await (await ethers.getContractFactory("MockSupra")).deploy();
     await oracle.set(100000000n, 8, now * 1000);
-    contract = await (await ethers.getContractFactory("Hillcash")).deploy(await oracle.getAddress());
+    contract = await (await ethers.getContractFactory("Hillcash")).deploy(await oracle.getAddress(), 18);
     await contract.connect(provider).createOffer(ethers.id("compute:100-calls"), 100, 2, now + 3600, now + 7200);
     await contract.connect(alice).join(1, 125, 500, { value: ethers.parseEther("1.2") });
     await contract.connect(bob).join(1, 125, 500, { value: ethers.parseEther("1.2") });

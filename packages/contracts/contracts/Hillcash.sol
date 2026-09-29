@@ -12,6 +12,7 @@ contract Hillcash {
     uint16 public constant MAX_MOVEMENT_BPS = 2_000;
 
     ISupraSValueFeed public immutable oracle;
+    uint8 public immutable nativeDecimals;
     uint256 public nextOfferId;
     uint256 private entered;
 
@@ -62,9 +63,13 @@ contract Hillcash {
         entered = 0;
     }
 
-    constructor(address supraOracle) {
-        if (supraOracle == address(0) || supraOracle.code.length == 0) revert InvalidOffer();
+    /// @param evmNativeDecimals HBAR is observed as 8-decimal units in Hedera testnet EVM execution;
+    /// local Ethereum EVMs use 18. This setting also governs payout and refund amounts.
+    constructor(address supraOracle, uint8 evmNativeDecimals) {
+        if (supraOracle == address(0) || supraOracle.code.length == 0 ||
+            (evmNativeDecimals != 8 && evmNativeDecimals != 18)) revert InvalidOffer();
         oracle = ISupraSValueFeed(supraOracle);
+        nativeDecimals = evmNativeDecimals;
     }
 
     function createOffer(
@@ -88,8 +93,8 @@ contract Hillcash {
         if (msg.sender == offer.provider || orders[id][msg.sender].deposited != 0 || maxUsdCents < offer.unitUsdCents) revert InvalidOffer();
         if (maxMovementBps == 0 || maxMovementBps > MAX_MOVEMENT_BPS) revert InvalidOffer();
         ISupraSValueFeed.PriceFeed memory feed = _freshFeed();
-        uint256 requiredWei = _quote(offer.unitUsdCents, feed);
-        if (msg.value < requiredWei) revert InvalidOffer();
+        uint256 requiredNative = _quoteNative(offer.unitUsdCents, feed);
+        if (msg.value < requiredNative) revert InvalidOffer();
         Order storage order = orders[id][msg.sender];
         order.deposited = msg.value;
         order.joinPriceE18 = _normalize(feed);
@@ -99,9 +104,9 @@ contract Hillcash {
         emit Joined(id, msg.sender, msg.value, order.joinPriceE18, maxMovementBps);
     }
 
-    /// @dev Converts USD cents into wei, rounding up so a deposit never underpays.
+    /// @notice JSON-RPC wallet quote in 18-decimal wei, rounded up to the EVM's native unit.
     function quoteWei(uint256 usdCents) public view returns (uint256) {
-        return _quote(usdCents, _freshFeed());
+        return _quoteNative(usdCents, _freshFeed()) * (10 ** (18 - nativeDecimals));
     }
 
     function marketPriceE18() external view returns (uint256 price, uint256 timeMs) {
@@ -122,11 +127,11 @@ contract Hillcash {
         return feed.price * (10 ** (18 - feed.decimals));
     }
 
-    function _quote(uint256 usdCents, ISupraSValueFeed.PriceFeed memory feed) private pure returns (uint256) {
-        // USD cents / (USD per HBAR): cents * 10^decimals * 10^18 / (100 * price).
+    function _quoteNative(uint256 usdCents, ISupraSValueFeed.PriceFeed memory feed) private view returns (uint256) {
+        // USD cents / (USD per HBAR): cents * 10^feed decimals * 10^nativeDecimals / (100 * price).
         // Bound the user input before multiplication. Commercial offers need no more than $1m.
         if (usdCents == 0 || usdCents > 100_000_000) revert InvalidPrice();
-        uint256 numerator = usdCents * (10 ** feed.decimals) * 1 ether;
+        uint256 numerator = usdCents * (10 ** feed.decimals) * (10 ** nativeDecimals);
         uint256 denominator = 100 * feed.price;
         return numerator / denominator + (numerator % denominator == 0 ? 0 : 1);
     }
@@ -136,7 +141,7 @@ contract Hillcash {
         if (offer.provider == address(0)) revert InvalidOffer();
         if (offer.state != State.Open || block.timestamp >= offer.joinDeadline || offer.members < offer.minimum) revert InvalidState();
         ISupraSValueFeed.PriceFeed memory feed = _freshFeed();
-        uint256 due = _quote(offer.unitUsdCents, feed);
+        uint256 due = _quoteNative(offer.unitUsdCents, feed);
         uint256 currentPrice = _normalize(feed);
         address[] storage buyers = participants[id];
         for (uint256 i; i < buyers.length; ++i) {
