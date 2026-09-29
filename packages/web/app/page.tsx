@@ -17,6 +17,7 @@ export default function Home() {
   const [offers, setOffers] = useState<Offer[]>([]);
   const [service, setService] = useState("compute:100-calls");
   const [cap, setCap] = useState("1.25");
+  const [movement, setMovement] = useState("3");
   const [price, setPrice] = useState("1.00");
   const [chainOfferId, setChainOfferId] = useState("");
   const [deliveryToken, setDeliveryToken] = useState("");
@@ -55,6 +56,7 @@ export default function Home() {
       const { contract, signer } = await walletContract();
       const offerId = kind === "create" ? 0n : BigInt(chainOfferId);
       let tx;
+      let joinQuote = "";
       if (kind === "create") {
         const cents = Math.round(Number(price) * 100);
         if (!Number.isSafeInteger(cents) || cents < 1 || !service.trim()) throw new Error("Enter a valid service and price.");
@@ -64,11 +66,16 @@ export default function Home() {
         if (offerId < 1n) throw new Error("Enter a valid on-chain offer ID.");
         if (kind === "join") {
           const cents = Math.round(Number(cap) * 100);
+          const movementBps = Math.round(Number(movement) * 100);
+          if (!Number.isSafeInteger(cents) || cents < 1 || !Number.isInteger(movementBps) ||
+              movementBps < 1 || movementBps > 2000) throw new Error("Enter a positive USD cap and market movement limit from 0.01% to 20%.");
           const offer = await contract.offers(offerId);
           if (BigInt(cents) < offer.unitUsdCents) throw new Error("Your USD cap is below this offer.");
+          const [marketPrice] = await contract.marketPriceE18();
           const due = await contract.quoteWei(offer.unitUsdCents);
-          // Quote immediately before signing; the contract checks the price again.
-          tx = await contract.join(offerId, cents, { value: due + due / 20n + 1n });
+          // The contract snapshots the rate again inside join; this quote is only a preview.
+          tx = await contract.join(offerId, cents, movementBps, { value: due + due / 20n + 1n });
+          joinQuote = ` Preview ${Number(marketPrice) / 1e18} USD/HBAR; ${movementBps / 100}% limit.`;
         } else {
           if (kind === "accept") {
             const order = await contract.orders(offerId, await signer.getAddress());
@@ -79,7 +86,7 @@ export default function Home() {
           tx = await contract[kind](offerId);
         }
       }
-      setNotice(`Transaction submitted: ${tx.hash}. Waiting for confirmation…`);
+      setNotice(`Transaction submitted: ${tx.hash}.${joinQuote} Waiting for confirmation…`);
       const receipt = await tx.wait();
       setNotice(`Confirmed: ${receipt.hash}. View it on Hashscan Testnet.`);
     } catch (error) { setNotice(error instanceof Error ? error.message : "Transaction failed."); }
@@ -102,7 +109,7 @@ export default function Home() {
         {result.proposals.length ? result.proposals.map((p: {offerId: string; buyerIds: string[]; unitUsdCents: number; savedUsdCents: number; explanation: string}) => <div className="opportunity" key={p.offerId}><div className="offer-icon">↗</div><div><strong>{p.offerId}</strong><p>{p.buyerIds.length} buyers · {p.explanation}</p></div><div className="offer-price"><strong>{money(p.unitUsdCents)}</strong><small>save {money(p.savedUsdCents)} total</small></div></div>) : <div className="empty"><div className="empty-symbol">◇</div><strong>No group ready yet</strong><p>Load the example marketplace or add requests and offers below to see the matching policy work.</p></div>}
       </section>}
       <div className="columns">
-        {tab !== "provider" && <section className="panel compact"><p className="eyebrow">FOR BUYERS</p><h2>State your limit</h2><label>Digital service<input value={service} onChange={e => setService(e.target.value)} /></label><label>Maximum price · USD<input value={cap} onChange={e => setCap(e.target.value)} inputMode="decimal" /></label><button className="secondary" onClick={addRequest}>Add local request <span>＋</span></button><p className="footnote">Local planning is illustrative. Joining a real offer requires your wallet approval.</p></section>}
+        {tab !== "provider" && <section className="panel compact"><p className="eyebrow">FOR BUYERS</p><h2>State your limit</h2><label>Digital service<input value={service} onChange={e => setService(e.target.value)} /></label><label>Maximum price · USD<input value={cap} onChange={e => setCap(e.target.value)} inputMode="decimal" /></label><label>Maximum HBAR market movement · %<input value={movement} onChange={e => setMovement(e.target.value)} inputMode="decimal" /></label><button className="secondary" onClick={addRequest}>Add local request <span>＋</span></button><p className="footnote">The on-chain limit is measured from your join price to activation. If any buyer's limit is exceeded, activation waits; unactivated orders can be refunded after the join deadline. Local planning is illustrative.</p></section>}
         <section className="panel compact"><p className="eyebrow">FOR PROVIDERS</p><h2>Post a group price</h2><label>Price per buyer · USD<input value={price} onChange={e => setPrice(e.target.value)} inputMode="decimal" /></label><button className="secondary" onClick={addOffer}>Add local offer <span>＋</span></button><button className="text-button" disabled={busy || !address} onClick={() => chainAction("create")}>Create offer on Hedera ↗</button><p className="footnote">Minimum 2 buyers; 1 hour join window; 2 hour delivery window. On-chain settlement uses Supra HBAR/USD.</p></section>
         <section className="panel compact"><p className="eyebrow">TESTNET CONTRACT</p><h2>Buyer-controlled escrow</h2><label>On-chain offer ID<input value={chainOfferId} onChange={e => setChainOfferId(e.target.value)} inputMode="numeric" placeholder="e.g. 1" /></label><label>Private entitlement token<input type="password" autoComplete="off" value={deliveryToken} onChange={e => setDeliveryToken(e.target.value)} placeholder="Required before accepting delivery" /></label><div className="action-grid">{(["join", "activate", "accept", "refund"] as const).map(kind => <button key={kind} disabled={busy || !address} onClick={() => chainAction(kind)}>{kind}</button>)}</div><p className="footnote">{address ? `Contract ${address.slice(0, 8)}…${address.slice(-6)}` : "Set NEXT_PUBLIC_HILLCASH_CONTRACT to enable transactions."}</p></section>
       </div>
