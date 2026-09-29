@@ -10,10 +10,14 @@ async function main() {
   const code = await rpc.getCode(address);
   if (code === "0x") throw new Error(`No code at Supra holder ${address}`);
   const feed = await new ethers.Contract(address, abi, rpc).getSvalue(432);
-  const age = Math.floor(Date.now() / 1000) - Number(feed.time);
+  const timestampMs = Number(feed.time);
+  const age = Math.floor(Date.now() / 1000) - Math.floor(timestampMs / 1000);
   const result = { address, pair: 432, round: feed.round.toString(), decimals: feed.decimals.toString(),
-    price: feed.price.toString(), timestamp: feed.time.toString(), ageSeconds: age, fresh: age >= 0 && age <= 7200 };
+    price: feed.price.toString(), timestampMs: feed.time.toString(),
+    timestampUtc: Number.isSafeInteger(timestampMs) && timestampMs <= 8_640_000_000_000_000
+      ? new Date(timestampMs).toISOString() : null,
+    ageSeconds: age, fresh: timestampMs >= 1_000_000_000_000 && age >= 0 && age <= 7200 };
   console.log(JSON.stringify(result, null, 2));
-  if (feed.price === 0n || !result.fresh) process.exitCode = 1;
+  if (feed.price === 0n || feed.decimals > 18n || !result.fresh) process.exitCode = 1;
 }
 main().catch(error => { console.error(error.message); process.exitCode = 1; });

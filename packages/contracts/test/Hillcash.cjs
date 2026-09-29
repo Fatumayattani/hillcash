@@ -22,7 +22,7 @@ describe("Hillcash escrow", function () {
     [provider, alice, bob, stranger] = await ethers.getSigners();
     now = (await ethers.provider.getBlock("latest")).timestamp;
     oracle = await (await ethers.getContractFactory("MockSupra")).deploy();
-    await oracle.set(100000000n, 8, now); // $1 per HBAR
+    await oracle.set(100000000n, 8, now * 1000); // $1 per HBAR; Supra time is milliseconds
     contract = await (await ethers.getContractFactory("Hillcash")).deploy(await oracle.getAddress());
   });
 
@@ -37,18 +37,26 @@ describe("Hillcash escrow", function () {
   });
   it("rounds conversion up and checks price freshness", async function () {
     expect(await contract.quoteWei(101)).to.equal(ethers.parseEther("1.01"));
-    await oracle.set(300000000n, 8, now);
+    await oracle.set(300000000n, 8, now * 1000);
     expect(await contract.quoteWei(100)).to.equal(333333333333333334n);
     await clock(now + 7201);
     await expect(contract.quoteWei(100)).to.be.reverted;
   });
   it("rejects zero, future and absurdly scaled feeds", async function () {
-    await oracle.set(0, 8, now);
+    await oracle.set(0, 8, now * 1000);
     await expect(contract.quoteWei(100)).to.be.reverted;
-    await oracle.set(100, 19, now);
+    await oracle.set(100, 19, now * 1000);
     await expect(contract.quoteWei(100)).to.be.reverted;
-    await oracle.set(100, 8, now + 100);
+    await oracle.set(100, 8, (now + 100) * 1000);
     await expect(contract.quoteWei(100)).to.be.reverted;
+    await oracle.set(100, 8, now);
+    await expect(contract.quoteWei(100)).to.be.reverted; // seconds-format feed
+  });
+  it("quotes the live Hedera feed format: 18 decimals and millisecond time", async function () {
+    await oracle.set(118190000000000000n, 18, now * 1000);
+    const due = await contract.quoteWei(100); // $1 at $0.11819 per HBAR
+    expect(due).to.equal(8460952703274388697n);
+    expect(due).to.be.greaterThan(ethers.parseEther("8"));
   });
   it("requires a USD cap and a sufficient deposit", async function () {
     const id = await offer();
@@ -71,7 +79,7 @@ describe("Hillcash escrow", function () {
     const id = await offer();
     await join(id, alice, ethers.parseEther("1"));
     await join(id, bob, ethers.parseEther("1"));
-    await oracle.set(50000000n, 8, now);
+    await oracle.set(50000000n, 8, now * 1000);
     await expect(contract.activate(id)).to.be.reverted;
   });
   it("rejects provider impersonation and duplicate delivery", async function () {
@@ -89,6 +97,7 @@ describe("Hillcash escrow", function () {
     await contract.connect(provider).commitDelivery(id, alice.address, ethers.id("alice-token"));
     const before = await ethers.provider.getBalance(provider.address);
     await contract.connect(alice).accept(id);
+    expect((await contract.orders(id, alice.address)).accepted).to.equal(true);
     expect(await ethers.provider.getBalance(provider.address) - before).to.equal(ethers.parseEther("1"));
     expect(await ethers.provider.getBalance(await contract.getAddress())).to.equal(ethers.parseEther("2"));
     await expect(contract.connect(alice).accept(id)).to.be.reverted;
@@ -107,6 +116,7 @@ describe("Hillcash escrow", function () {
     await clock(now + 7201);
     await expect(contract.connect(alice).accept(id)).to.be.reverted;
     await contract.connect(alice).refund(id); await contract.connect(bob).refund(id);
+    expect((await contract.orders(id, alice.address)).accepted).to.equal(false);
     expect(await ethers.provider.getBalance(await contract.getAddress())).to.equal(0n);
   });
   it("lets the provider cancel only before activation", async function () {

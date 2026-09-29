@@ -19,6 +19,7 @@ export default function Home() {
   const [cap, setCap] = useState("1.25");
   const [price, setPrice] = useState("1.00");
   const [chainOfferId, setChainOfferId] = useState("");
+  const [deliveryToken, setDeliveryToken] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const now = Date.now();
@@ -51,7 +52,7 @@ export default function Home() {
   async function chainAction(kind: "create" | "join" | "activate" | "accept" | "refund") {
     setBusy(true); setNotice("");
     try {
-      const { contract } = await walletContract();
+      const { contract, signer } = await walletContract();
       const offerId = kind === "create" ? 0n : BigInt(chainOfferId);
       let tx;
       if (kind === "create") {
@@ -68,7 +69,15 @@ export default function Home() {
           const due = await contract.quoteWei(offer.unitUsdCents);
           // Quote immediately before signing; the contract checks the price again.
           tx = await contract.join(offerId, cents, { value: due + due / 20n + 1n });
-        } else tx = await contract[kind](offerId);
+        } else {
+          if (kind === "accept") {
+            const order = await contract.orders(offerId, await signer.getAddress());
+            if (!order.delivered || !/^[0-9a-f]{64}$/.test(deliveryToken) ||
+                hashId(deliveryToken).toLowerCase() !== order.entitlementHash.toLowerCase())
+              throw new Error("The private entitlement token does not match this buyer's on-chain delivery commitment.");
+          }
+          tx = await contract[kind](offerId);
+        }
       }
       setNotice(`Transaction submitted: ${tx.hash}. Waiting for confirmation…`);
       const receipt = await tx.wait();
@@ -95,7 +104,7 @@ export default function Home() {
       <div className="columns">
         {tab !== "provider" && <section className="panel compact"><p className="eyebrow">FOR BUYERS</p><h2>State your limit</h2><label>Digital service<input value={service} onChange={e => setService(e.target.value)} /></label><label>Maximum price · USD<input value={cap} onChange={e => setCap(e.target.value)} inputMode="decimal" /></label><button className="secondary" onClick={addRequest}>Add local request <span>＋</span></button><p className="footnote">Local planning is illustrative. Joining a real offer requires your wallet approval.</p></section>}
         <section className="panel compact"><p className="eyebrow">FOR PROVIDERS</p><h2>Post a group price</h2><label>Price per buyer · USD<input value={price} onChange={e => setPrice(e.target.value)} inputMode="decimal" /></label><button className="secondary" onClick={addOffer}>Add local offer <span>＋</span></button><button className="text-button" disabled={busy || !address} onClick={() => chainAction("create")}>Create offer on Hedera ↗</button><p className="footnote">Minimum 2 buyers; 1 hour join window; 2 hour delivery window. On-chain settlement uses Supra HBAR/USD.</p></section>
-        <section className="panel compact"><p className="eyebrow">TESTNET CONTRACT</p><h2>Buyer-controlled escrow</h2><label>On-chain offer ID<input value={chainOfferId} onChange={e => setChainOfferId(e.target.value)} inputMode="numeric" placeholder="e.g. 1" /></label><div className="action-grid">{(["join", "activate", "accept", "refund"] as const).map(kind => <button key={kind} disabled={busy || !address} onClick={() => chainAction(kind)}>{kind}</button>)}</div><p className="footnote">{address ? `Contract ${address.slice(0, 8)}…${address.slice(-6)}` : "Set NEXT_PUBLIC_HILLCASH_CONTRACT to enable transactions."}</p></section>
+        <section className="panel compact"><p className="eyebrow">TESTNET CONTRACT</p><h2>Buyer-controlled escrow</h2><label>On-chain offer ID<input value={chainOfferId} onChange={e => setChainOfferId(e.target.value)} inputMode="numeric" placeholder="e.g. 1" /></label><label>Private entitlement token<input type="password" autoComplete="off" value={deliveryToken} onChange={e => setDeliveryToken(e.target.value)} placeholder="Required before accepting delivery" /></label><div className="action-grid">{(["join", "activate", "accept", "refund"] as const).map(kind => <button key={kind} disabled={busy || !address} onClick={() => chainAction(kind)}>{kind}</button>)}</div><p className="footnote">{address ? `Contract ${address.slice(0, 8)}…${address.slice(-6)}` : "Set NEXT_PUBLIC_HILLCASH_CONTRACT to enable transactions."}</p></section>
       </div>
       {notice && <div className="notice" role="status">{notice}</div>}
       <footer>HILLCASH · INDIVIDUAL CONTROL, COLLECTIVE LEVERAGE <span>Prototype · Testnet HBAR has no monetary value</span></footer>
