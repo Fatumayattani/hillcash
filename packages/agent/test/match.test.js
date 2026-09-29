@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { planPurchases } from "../src/match.js";
+import { planPurchases, rateWithinLimit } from "../src/match.js";
 
 const now = 1_000_000;
 const address = n => `0x${n.toString(16).padStart(40, "0")}`;
@@ -50,4 +50,32 @@ test("ignores invalid and expired offers and requests", () => {
 test("rejects malformed top-level input", () => {
   assert.throws(() => planPurchases(null, [], now), TypeError);
   assert.throws(() => planPurchases([], {}, now), TypeError);
+});
+test("checks a buyer's movement limit in both directions, including its boundary", () => {
+  const one = 10n ** 18n;
+  assert.equal(rateWithinLimit(one, one * 99n / 100n, 100), true);
+  assert.equal(rateWithinLimit(one, one * 101n / 100n, 100), true);
+  assert.equal(rateWithinLimit(one, one * 98n / 100n, 100), false);
+  assert.equal(rateWithinLimit(one, one * 102n / 100n, 100), false);
+});
+test("excludes risk-blocked buyers without dropping a viable group", () => {
+  const one = 10n ** 18n;
+  const buyers = [request(1, { referencePriceE18: one, maxMovementBps: 100 }),
+    request(2, { referencePriceE18: one, maxMovementBps: 500 }), request(3)];
+  const result = planPurchases(buyers, [offer()], now, one * 98n / 100n);
+  assert.deepEqual(result.proposals[0].buyerIds, ["r2", "r3"]);
+  assert.deepEqual(result.unmatched, ["r1"]);
+});
+test("does not imply a fresh market price when a guarded buyer has no live quote", () => {
+  const one = 10n ** 18n;
+  const buyers = [request(1, { referencePriceE18: one, maxMovementBps: 100 }), request(2)];
+  assert.deepEqual(planPurchases(buyers, [offer()], now).proposals, []);
+  assert.throws(() => planPurchases(buyers, [offer()], now, 0n), TypeError);
+});
+test("rejects invalid rate settings and price inputs", () => {
+  const one = 10n ** 18n;
+  assert.throws(() => rateWithinLimit(one, one, 0), TypeError);
+  assert.throws(() => rateWithinLimit(one, one, 2001), TypeError);
+  assert.throws(() => rateWithinLimit(one, 0n, 100), TypeError);
+  assert.deepEqual(planPurchases([request(1, { referencePriceE18: one, maxMovementBps: 0 }), request(2)], [offer()], now, one).proposals, []);
 });

@@ -16,8 +16,8 @@ describe("Sample provider and escrow integration", function () {
     await oracle.set(100000000n, 8, now * 1000);
     contract = await (await ethers.getContractFactory("Hillcash")).deploy(await oracle.getAddress());
     await contract.connect(provider).createOffer(ethers.id("compute:100-calls"), 100, 2, now + 3600, now + 7200);
-    await contract.connect(alice).join(1, 125, { value: ethers.parseEther("1.2") });
-    await contract.connect(bob).join(1, 125, { value: ethers.parseEther("1.2") });
+    await contract.connect(alice).join(1, 125, 500, { value: ethers.parseEther("1.2") });
+    await contract.connect(bob).join(1, 125, 500, { value: ethers.parseEther("1.2") });
     await contract.activate(1);
   });
   it("binds a unique token to one buyer and unlocks service only after acceptance", async function () {

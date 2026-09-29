@@ -10,8 +10,8 @@ describe("Hillcash escrow", function () {
     await contract.connect(provider).createOffer(serviceId, 100, minimum, now + 3600, now + 7200);
     return await contract.nextOfferId();
   }
-  async function join(id, signer, deposit = ethers.parseEther("2"), cap = 100) {
-    return contract.connect(signer).join(id, cap, { value: deposit });
+  async function join(id, signer, deposit = ethers.parseEther("2"), cap = 100, movementBps = 500) {
+    return contract.connect(signer).join(id, cap, movementBps, { value: deposit });
   }
   async function clock(to) {
     await ethers.provider.send("evm_setNextBlockTimestamp", [to]);
@@ -65,6 +65,45 @@ describe("Hillcash escrow", function () {
     await join(id, alice);
     await expect(join(id, alice)).to.be.reverted;
     await expect(join(id, provider)).to.be.reverted;
+  });
+  it("requires a bounded nonzero market movement limit and records the join snapshot", async function () {
+    const id = await offer();
+    await expect(join(id, alice, ethers.parseEther("2"), 100, 0)).to.be.revertedWithCustomError(contract, "InvalidOffer");
+    await expect(join(id, alice, ethers.parseEther("2"), 100, 2001)).to.be.revertedWithCustomError(contract, "InvalidOffer");
+    await join(id, alice, ethers.parseEther("2"), 100, 300);
+    const order = await contract.orders(id, alice.address);
+    expect(order.joinPriceE18).to.equal(ethers.parseEther("1"));
+    expect(order.maxMovementBps).to.equal(300);
+    expect((await contract.marketPriceE18())[0]).to.equal(order.joinPriceE18);
+  });
+  it("blocks activation when a buyer's movement limit is exceeded, even if deposits cover the price", async function () {
+    const id = await offer();
+    await join(id, alice, ethers.parseEther("2"), 100, 100); // 1%
+    await join(id, bob, ethers.parseEther("2"), 100, 500); // 5%
+    await oracle.set(98000000n, 8, now * 1000); // $0.98; due stays below $2
+    await expect(contract.activate(id)).to.be.revertedWithCustomError(contract, "MarketMoved");
+    expect((await contract.offers(id)).state).to.equal(0);
+    await oracle.set(99000000n, 8, now * 1000); // exactly 1% is accepted
+    await contract.activate(id);
+    expect((await contract.orders(id, alice.address)).due).to.equal(1010101010101010102n);
+  });
+  it("measures both price directions from each buyer's own join snapshot", async function () {
+    const id = await offer();
+    await join(id, alice, ethers.parseEther("2"), 100, 100);
+    await oracle.set(102000000n, 8, now * 1000);
+    await join(id, bob, ethers.parseEther("2"), 100, 500);
+    await expect(contract.activate(id)).to.be.revertedWithCustomError(contract, "MarketMoved");
+    await oracle.set(101000000n, 8, now * 1000);
+    await contract.activate(id); // Alice +1%, Bob -0.98%
+  });
+  it("fails closed on a stale or malformed rate at join and activation", async function () {
+    const id = await offer();
+    await oracle.set(100000000n, 8, now);
+    await expect(join(id, alice)).to.be.revertedWithCustomError(contract, "InvalidPrice");
+    await oracle.set(100000000n, 8, now * 1000);
+    await join(id, alice); await join(id, bob);
+    await oracle.set(100000000n, 8, (now + 100) * 1000);
+    await expect(contract.activate(id)).to.be.revertedWithCustomError(contract, "InvalidPrice");
   });
   it("activates only with minimum buyers", async function () {
     const id = await offer();

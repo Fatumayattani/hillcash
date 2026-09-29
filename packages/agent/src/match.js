@@ -1,6 +1,7 @@
 /** Deterministic purchasing agent. It proposes groups; buyers authorize each on-chain join. */
-export function planPurchases(requests, offers, now = Date.now()) {
+export function planPurchases(requests, offers, now = Date.now(), marketPriceE18) {
   if (!Array.isArray(requests) || !Array.isArray(offers) || !Number.isSafeInteger(now)) throw new TypeError("Invalid input");
+  if (marketPriceE18 !== undefined && !validPrice(marketPriceE18)) throw new TypeError("Invalid market price");
   const eligible = new Map();
   for (const request of requests) {
     if (!validRequest(request, now)) continue;
@@ -19,7 +20,9 @@ export function planPurchases(requests, offers, now = Date.now()) {
   for (const offer of sortedOffers) {
     const candidates = remaining.filter(r => r.serviceId === offer.serviceId &&
       r.units <= offer.unitsPerBuyer && r.maxUsdCents >= offer.unitUsdCents &&
-      r.soloUsdCents > offer.unitUsdCents && r.expiresAt >= offer.joinDeadline);
+      r.soloUsdCents > offer.unitUsdCents && r.expiresAt >= offer.joinDeadline &&
+      (r.referencePriceE18 === undefined || (marketPriceE18 !== undefined &&
+        rateWithinLimit(r.referencePriceE18, marketPriceE18, r.maxMovementBps))));
     if (candidates.length < offer.minimum) continue;
     const buyers = candidates.slice(0, Math.min(offer.capacity, 32));
     if (buyers.length < offer.minimum) continue;
@@ -39,7 +42,9 @@ function validRequest(r, now) {
     typeof r.buyer === "string" && /^0x[0-9a-fA-F]{40}$/.test(r.buyer) &&
     typeof r.serviceId === "string" && r.serviceId.length > 0 &&
     safePositive(r.units) && safePositive(r.maxUsdCents) && safePositive(r.soloUsdCents) &&
-    Number.isSafeInteger(r.expiresAt) && r.expiresAt > now;
+    Number.isSafeInteger(r.expiresAt) && r.expiresAt > now &&
+    (r.referencePriceE18 === undefined ||
+      (validPrice(r.referencePriceE18) && validBps(r.maxMovementBps)));
 }
 
 function validOffer(o, now) {
@@ -53,3 +58,14 @@ function validOffer(o, now) {
 }
 
 function safePositive(n) { return Number.isSafeInteger(n) && n > 0; }
+function validPrice(n) { return typeof n === "bigint" && n > 0n; }
+function validBps(n) { return Number.isInteger(n) && n >= 1 && n <= 2000; }
+
+/** Advisory filter only. The contract verifies a fresh feed again at activation. */
+export function rateWithinLimit(referencePriceE18, currentPriceE18, maxMovementBps) {
+  if (!validPrice(referencePriceE18) || !validPrice(currentPriceE18) || !validBps(maxMovementBps))
+    throw new TypeError("Invalid rate limit");
+  const delta = referencePriceE18 > currentPriceE18
+    ? referencePriceE18 - currentPriceE18 : currentPriceE18 - referencePriceE18;
+  return delta * 10000n <= referencePriceE18 * BigInt(maxMovementBps);
+}
