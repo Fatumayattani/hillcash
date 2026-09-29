@@ -67,7 +67,7 @@ The sample provider listens only on localhost, tracks usage in a private local f
 
 ### HCS decision audit
 
-Set `HEDERA_OPERATOR_ID`, `HEDERA_OPERATOR_KEY`, and `HILLCASH_CONTRACT` in `.env`, then create an HCS topic:
+Set `HEDERA_OPERATOR_ID` and `HILLCASH_CONTRACT` in `.env`, then create an HCS topic. The client uses `HEDERA_PRIVATE_KEY` by default; set `HEDERA_OPERATOR_KEY` only for a different funded ECDSA account. Look up the numeric account ID from the operator's EVM address at the Hedera testnet Mirror Node.
 
 ```bash
 npm run audit:topic
