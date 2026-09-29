@@ -1,0 +1,10 @@
+node_modules/
+.next/
+artifacts/
+cache/
+coverage/
+.env
+.env.local
+.harness/runs/
+.harness/runtime/
+*.log

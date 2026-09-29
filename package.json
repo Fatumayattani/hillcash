@@ -1,0 +1,15 @@
+{
+  "name": "hillcash",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": ["packages/*"],
+  "engines": {"node": ">=20.18.3"},
+  "scripts": {
+    "dev": "npm run dev -w @hillcash/web",
+    "build": "npm run build -w @hillcash/web",
+    "lint": "npm run lint -w @hillcash/web",
+    "test": "npm run test -w @hillcash/agent && npm run test -w @hillcash/contracts",
+    "contracts:compile": "npm run compile -w @hillcash/contracts",
+    "oracle:check": "npm run oracle:check -w @hillcash/contracts"
+  }
+}
