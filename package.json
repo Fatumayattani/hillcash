@@ -8,8 +8,12 @@
     "dev": "npm run dev -w @hillcash/web",
     "build": "npm run build -w @hillcash/web",
     "lint": "npm run lint -w @hillcash/web",
-    "test": "npm run test -w @hillcash/agent && npm run test -w @hillcash/contracts",
+    "test": "npm run test -w @hillcash/agent && npm run test -w @hillcash/provider && npm run test -w @hillcash/audit && npm run test -w @hillcash/contracts",
     "contracts:compile": "npm run compile -w @hillcash/contracts",
-    "oracle:check": "npm run oracle:check -w @hillcash/contracts"
+    "oracle:check": "npm run oracle:check -w @hillcash/contracts",
+    "provider:issue": "npm run issue -w @hillcash/provider --",
+    "provider:serve": "npm run serve -w @hillcash/provider",
+    "audit:topic": "npm run topic -w @hillcash/audit",
+    "audit:anchor": "npm run anchor -w @hillcash/audit --"
   }
 }

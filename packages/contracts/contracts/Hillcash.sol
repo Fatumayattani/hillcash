@@ -30,6 +30,7 @@ contract Hillcash {
         uint256 due;
         bool delivered;
         bool resolved;
+        bool accepted;
         bytes32 entitlementHash;
     }
     mapping(uint256 => Offer) public offers;
@@ -92,8 +93,11 @@ contract Hillcash {
     /// @dev Converts USD cents into wei, rounding up so a deposit never underpays.
     function quoteWei(uint256 usdCents) public view returns (uint256) {
         ISupraSValueFeed.PriceFeed memory feed = oracle.getSvalue(HBAR_USD_PAIR);
-        if (feed.price == 0 || feed.decimals > 18 || feed.time > block.timestamp ||
-            block.timestamp - feed.time > MAX_ORACLE_AGE) revert InvalidPrice();
+        // Supra's Hedera push feed timestamps are Unix milliseconds. Reject seconds-format
+        // or malformed values rather than silently treating a stale feed as fresh.
+        if (feed.price == 0 || feed.decimals > 18 || feed.time < 1_000_000_000_000) revert InvalidPrice();
+        uint256 observedAt = feed.time / 1000;
+        if (observedAt > block.timestamp || block.timestamp - observedAt > MAX_ORACLE_AGE) revert InvalidPrice();
         // USD cents / (USD per HBAR): cents * 10^decimals * 10^18 / (100 * price).
         // Bound the user input before multiplication. Commercial offers need no more than $1m.
         if (usdCents == 0 || usdCents > 100_000_000) revert InvalidPrice();
@@ -135,6 +139,7 @@ contract Hillcash {
         if (offer.state != State.Active || !order.delivered || order.resolved ||
             block.timestamp >= offer.deliveryDeadline) revert InvalidState();
         order.resolved = true;
+        order.accepted = true;
         uint256 returned = order.deposited - order.due;
         _send(offer.provider, order.due);
         if (returned != 0) _send(payable(msg.sender), returned);

@@ -8,3 +8,6 @@ coverage/
 .harness/runs/
 .harness/runtime/
 *.log
+*.tsbuildinfo
+.provider-data.json
+.provider-data.json.tmp

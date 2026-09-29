@@ -7,7 +7,7 @@ export const abi = [
   "function activate(uint256 id)",
   "function quoteWei(uint256 usdCents) view returns (uint256)",
   "function offers(uint256 id) view returns (address provider,bytes32 serviceId,uint64 joinDeadline,uint64 deliveryDeadline,uint32 minimum,uint32 members,uint256 unitUsdCents,uint8 state)",
-  "function orders(uint256 id,address buyer) view returns (uint256 deposited,uint256 due,bool delivered,bool resolved,bytes32 entitlementHash)",
+  "function orders(uint256 id,address buyer) view returns (uint256 deposited,uint256 due,bool delivered,bool resolved,bool accepted,bytes32 entitlementHash)",
   "function commitDelivery(uint256 id,address buyer,bytes32 entitlementHash)",
   "function accept(uint256 id)", "function refund(uint256 id)", "function cancel(uint256 id)",
   "event OfferCreated(uint256 indexed offerId,address indexed provider,bytes32 indexed serviceId,uint256 unitUsdCents)"
