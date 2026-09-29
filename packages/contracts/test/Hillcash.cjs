@@ -23,11 +23,14 @@ describe("Hillcash escrow", function () {
     now = (await ethers.provider.getBlock("latest")).timestamp;
     oracle = await (await ethers.getContractFactory("MockSupra")).deploy();
     await oracle.set(100000000n, 8, now * 1000); // $1 per HBAR; Supra time is milliseconds
-    contract = await (await ethers.getContractFactory("Hillcash")).deploy(await oracle.getAddress());
+    contract = await (await ethers.getContractFactory("Hillcash")).deploy(await oracle.getAddress(), 18);
   });
 
   it("requires a deployed oracle", async function () {
-    await expect((await ethers.getContractFactory("Hillcash")).deploy(ethers.ZeroAddress)).to.be.reverted;
+    const factory = await ethers.getContractFactory("Hillcash");
+    await expect(factory.deploy(ethers.ZeroAddress, 8)).to.be.reverted;
+    await expect(factory.deploy(await oracle.getAddress(), 0)).to.be.reverted;
+    await expect(factory.deploy(await oracle.getAddress(), 9)).to.be.reverted;
   });
   it("rejects malformed offers", async function () {
     await expect(contract.createOffer(ethers.ZeroHash, 100, 2, now + 100, now + 200)).to.be.reverted;
@@ -164,5 +167,50 @@ describe("Hillcash escrow", function () {
     await contract.connect(provider).cancel(id);
     await contract.connect(alice).refund(id);
     await expect(join(id, bob)).to.be.reverted;
+  });
+});
+
+describe("Hedera tinybar execution accounting", function () {
+  let contract, oracle, provider, alice, bob, now;
+  beforeEach(async function () {
+    [provider, alice, bob] = await ethers.getSigners();
+    now = (await ethers.provider.getBlock("latest")).timestamp;
+    oracle = await (await ethers.getContractFactory("MockSupra")).deploy();
+    await oracle.set(117340000000000000n, 18, now * 1000);
+    contract = await (await ethers.getContractFactory("Hillcash")).deploy(await oracle.getAddress(), 8);
+    await contract.connect(provider).createOffer(ethers.id("compute:100-calls"), 50, 2, now + 3600, now + 7200);
+  });
+  it("quotes an 18-decimal wallet value rounded to 8-decimal native units", async function () {
+    const walletQuote = await contract.quoteWei(50);
+    const nativeDue = (walletQuote / 10n ** 10n);
+    expect(walletQuote % (10n ** 10n)).to.equal(0n);
+    expect(nativeDue).to.equal(426112153n);
+    expect(walletQuote).to.equal(nativeDue * 10n ** 10n);
+  });
+  it("joins with measured tinybar msg.value and pays native units only after acceptance", async function () {
+    const deposit = 470000000n; // 4.7 HBAR as observed inside Hedera testnet EVM
+    await contract.connect(alice).join(1, 50, 300, { value: deposit });
+    await contract.connect(bob).join(1, 50, 300, { value: deposit });
+    expect((await contract.orders(1, alice.address)).deposited).to.equal(deposit);
+    await contract.activate(1);
+    const due = (await contract.orders(1, alice.address)).due;
+    await contract.connect(provider).commitDelivery(1, alice.address, ethers.id("private-entitlement"));
+    const before = await ethers.provider.getBalance(provider.address);
+    await contract.connect(alice).accept(1);
+    expect(await ethers.provider.getBalance(provider.address) - before).to.equal(due);
+    expect(await ethers.provider.getBalance(await contract.getAddress())).to.equal(deposit);
+  });
+  it("refunds the exact deposited native amount after expiry", async function () {
+    const deposit = 470000000n;
+    await contract.connect(alice).join(1, 50, 300, { value: deposit });
+    await ethers.provider.send("evm_setNextBlockTimestamp", [now + 3601]);
+    await ethers.provider.send("evm_mine", []);
+    await contract.connect(alice).refund(1);
+    expect(await ethers.provider.getBalance(await contract.getAddress())).to.equal(0n);
+  });
+  it("rejects native deposits below the oracle quote", async function () {
+    const nativeDue = (await contract.quoteWei(50)) / (10n ** 10n);
+    await expect(contract.connect(alice).join(1, 50, 300, { value: nativeDue - 1n })).to.be.revertedWithCustomError(contract, "InvalidOffer");
+    await contract.connect(alice).join(1, 50, 300, { value: nativeDue });
   });
 });
