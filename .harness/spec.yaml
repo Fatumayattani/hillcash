@@ -1,0 +1,16 @@
+schemaVersion: 2
+name: hillcash-purchase-lifecycle
+description: Validate the Hillcash agent, escrow, and frontend as a reusable template.
+prd: .harness/prd.md
+baseline:
+  commands:
+    - name: install
+      command: npm ci
+    - name: tests
+      command: npm test
+    - name: compile
+      command: npm run contracts:compile
+    - name: lint
+      command: npm run lint
+    - name: build
+      command: npm run build
