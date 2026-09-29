@@ -65,6 +65,21 @@ curl -X POST http://127.0.0.1:3001/redeem \
 
 The sample provider listens only on localhost, tracks usage in a private local file, never saves plaintext tokens, and checks onchain delivery and acceptance for each call. It is a single-process demonstration; it has no hosted authentication, high-availability database, or concurrency across multiple server instances. Tokens stop working after a refund. The example service returns a usage receipt rather than supplying a paid third-party API.
 
+### Verified HCS testnet record
+
+The manual testnet activation for offer 1 was anchored to HCS topic
+[`0.0.10776777`](https://testnet.mirrornode.hedera.com/api/v1/topics/0.0.10776777/messages/1),
+sequence 1, in transaction `0.0.10775178@1790686424.381005862`. The public
+mirror returned digest
+`0x1b3620920fca0b5591a7caac840ae75501aaedea68f1483677d8a71e339e4451`
+and activation transaction
+`0xab59718a1f93dcf9923717e3a9ca6e80bbb4dd87f89ec2df50cd7bb0d3939baf`.
+
+This record documents a **manual testnet flow**, with `savedUsdCents: 0`.
+It does not establish an agent-generated match, an independently verified
+discount, or successful delivery to both buyers. The proposal stays local;
+only its digest and the activation reference were published to HCS.
+
 ### HCS decision audit
 
 Set `HEDERA_OPERATOR_ID` and `HILLCASH_CONTRACT` in `.env`, then create an HCS topic. The client uses `HEDERA_PRIVATE_KEY` by default; set `HEDERA_OPERATOR_KEY` only for a different funded ECDSA account. Look up the numeric account ID from the operator's EVM address at the Hedera testnet Mirror Node.
@@ -107,7 +122,7 @@ The `oracle:check` command requires access to a Hedera testnet JSON-RPC endpoint
 - `packages/audit`: HCS topic and audit submission tools; verifies a matching contract activation first.
 - `.harness`: incremental feature brief and deterministic validator for Hedera Harness.
 
-The sample provider supplies individual entitlements and a local redemption API. Connecting external providers requires their participation, authenticated offers, and a reliable delivery channel. The HCS tool is implemented but has not been exercised on testnet in this environment. Buyers can check a token's onchain commitment before paying; that check does not prove the provider will remain online or deliver a valuable service. This prototype is unsuitable for real-value commerce until provider reliability and dispute handling are resolved.
+The sample provider supplies individual entitlements and a local redemption API. Connecting external providers requires their participation, authenticated offers, and a reliable delivery channel. The HCS tool has been exercised on testnet for one manual activation; this does not verify an agent-generated match. Buyers can check a token's onchain commitment before paying; that check does not prove the provider will remain online or deliver a valuable service. This prototype is unsuitable for real-value commerce until provider reliability and dispute handling are resolved.
 
 ## External template gate
 
