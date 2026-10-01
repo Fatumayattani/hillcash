@@ -18,6 +18,56 @@
       "frontend": "nextjs-app",
       "solidityFramework": "hardhat",
       "packageManager": "npm"
+    },
+    "outro": {
+      "installCommand": "npm ci",
+      "sections": [
+        {
+          "title": "Run Hillcash locally",
+          "steps": [
+            {
+              "command": "npm test"
+            },
+            {
+              "command": "npm run lint"
+            },
+            {
+              "command": "npm run build"
+            },
+            {
+              "command": "npm run dev"
+            },
+            {
+              "text": "Open http://localhost:3000. Local example matching requires no wallet or private key."
+            }
+          ]
+        },
+        {
+          "title": "Production server",
+          "steps": [
+            {
+              "command": "npm run build"
+            },
+            {
+              "command": "npm start"
+            }
+          ]
+        },
+        {
+          "title": "Hedera testnet",
+          "steps": [
+            {
+              "text": "Follow README.md to configure a funded testnet wallet and the provider and HCS tools."
+            },
+            {
+              "command": "npm run oracle:check"
+            },
+            {
+              "command": "npm run deploy:testnet -w @hillcash/contracts"
+            }
+          ]
+        }
+      ]
     }
   }
 }
