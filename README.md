@@ -19,6 +19,33 @@ npm run dev
 
 Open http://localhost:3000. Use **Load example marketplace** to try local matching; those accounts and offers are fixtures. Local planning requires no wallet or paid AI API. The agent's policy is deterministic and testable; a language model is not trusted with spending authorization.
 
+## Scaffold setup and verification
+
+Scaffold-HBAR CLI 0.4.1 requires Yarn to be available even when this
+template selects npm. Enable it with Corepack before scaffolding.
+
+Create a copy outside an existing checkout with:
+`npx create-scaffold-hbar@0.4.1 hillcash-fresh --template Fatumayattani/hillcash --frontend nextjs-app --solidity-framework hardhat --network testnet --yes --skip-install --skip-hedera-skills`
+
+Enter `hillcash-fresh`, then run `npm ci`, `npm test`, `npm run lint`,
+`npm run build`, and `npm run dev`. For a production server, run
+`npm run build` followed by `npm start`.
+
+On October 1, 2026, a fresh external scaffold passed installation,
+54 tests, TypeScript checks, and a production build. Its production
+server returned HTTP 200 with Hillcash's page without copying an existing
+.env. Local example matching still uses fixtures.
+
+### Dependency audit
+
+The updated dependency resolution passed `npm audit --omit=dev` with
+zero reported vulnerabilities. Root overrides select patched gRPC,
+WebSocket, PostCSS, and protobuf releases.
+
+The full audit still reports 20 development-dependency findings,
+including 7 high severity. Those require further remediation.
+A clean runtime audit is not a security audit of the escrow or product.
+
 ## Hedera testnet
 
 1. Copy `.env.example` to `.env` and configure `HEDERA_PRIVATE_KEY` for a **testnet-only funded account**. Never commit `.env`.

@@ -2,8 +2,12 @@
   "name": "hillcash",
   "private": true,
   "version": "0.1.0",
-  "workspaces": ["packages/*"],
-  "engines": {"node": ">=20.18.3"},
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20.18.3"
+  },
   "scripts": {
     "dev": "npm run dev -w @hillcash/web",
     "build": "npm run build -w @hillcash/web",
@@ -14,6 +18,13 @@
     "provider:issue": "npm run issue -w @hillcash/provider --",
     "provider:serve": "npm run serve -w @hillcash/provider",
     "audit:topic": "npm run topic -w @hillcash/audit",
-    "audit:anchor": "npm run anchor -w @hillcash/audit --"
+    "audit:anchor": "npm run anchor -w @hillcash/audit --",
+    "start": "npm run start -w @hillcash/web --"
+  },
+  "overrides": {
+    "@grpc/grpc-js": "1.13.6",
+    "ws@>=8 <9": "8.21.0",
+    "postcss@>=8 <9": "8.5.28",
+    "protobufjs@>=8 <9": "8.8.0"
   }
 }
