@@ -1,9 +1,18 @@
 {
+  "name": "Hillcash",
+  "description": "Agent-assisted group purchasing with Supra price safeguards, Hedera escrow, and HCS activation records.",
+  "version": "0.1.0",
   "create-scaffold-hbar": {
     "capabilities": {
-      "frontend": ["nextjs-app"],
-      "solidityFramework": ["hardhat"],
-      "packageManager": ["npm"]
+      "frontend": [
+        "nextjs-app"
+      ],
+      "solidityFramework": [
+        "hardhat"
+      ],
+      "packageManager": [
+        "npm"
+      ]
     },
     "defaults": {
       "frontend": "nextjs-app",
