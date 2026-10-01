@@ -19,7 +19,8 @@
     "provider:serve": "npm run serve -w @hillcash/provider",
     "audit:topic": "npm run topic -w @hillcash/audit",
     "audit:anchor": "npm run anchor -w @hillcash/audit --",
-    "start": "npm run start -w @hillcash/web --"
+    "start": "npm run start -w @hillcash/web --",
+    "agent:plan": "npm run plan -w @hillcash/agent --"
   },
   "overrides": {
     "@grpc/grpc-js": "1.13.6",

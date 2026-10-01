@@ -3,6 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "exports": {".": "./src/match.js"},
-  "scripts": {"test": "node --test"}
+  "exports": {
+    ".": "./src/match.js",
+    "./live": "./src/live.js"
+  },
+  "scripts": {
+    "test": "node --test",
+    "plan": "node src/cli.js"
+  },
+  "dependencies": {
+    "dotenv": "16.4.5",
+    "ethers": "6.17.0"
+  }
 }

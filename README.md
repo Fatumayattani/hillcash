@@ -162,3 +162,80 @@ npm create scaffold-hbar@latest --template YOUR_GITHUB_USER/hillcash
 The bounty requires a successful external-template scaffold, clean install/lint/build/boot, valid `template.json`, README and AGENTS, MIT license, and a verifiable Hedera testnet transaction. These have **not** all been checked yet. Repository docs: https://hedera.com/blog/scaffold-hbar-template-bounty/. The template author must submit the Harness spec and validators if using Harness.
 
 Supra interface and pair documentation: https://docs.supra.com/oracles/data-feeds/push-oracle and https://docs.supra.com/oracles/data-feeds/data-feeds-index. Hedera testnet address: https://docs.supra.com/oracles/data-feeds/push-oracle/networks.
+
+## Verified testnet refund
+
+Offer 1's expired, unaccepted Buyer B order was refunded on Hedera
+testnet. The receipt's Refunded event matched the original deposit:
+4.64048869 HBAR. After refund, resolved was true and accepted was false.
+
+- Contract: 0x9846D66b0EB16BB8aaF18eA789420c838583B6fc
+- Transaction: 0xf137ff047a3a7981c709d522803ccac28cd7ddf777e1cd5529635d00262b9bf4
+- Verification date: 2026-10-01
+
+## Live agent proposals
+
+Run `npm run agent:plan -- REQUESTS CATALOG OUTPUT` with absolute JSON
+file paths. Keep buyer requests and proposal output outside the checkout.
+The runner reads the root .env and needs HEDERA_TESTNET_RPC_URL and
+HILLCASH_CONTRACT. It does not require private keys or submit transactions.
+
+REQUESTS is an array containing id, buyer, serviceId (bytes32 hex),
+units, maxUsdCents, soloUsdCents, expiresAt (Unix milliseconds), and
+maxMovementBps (1–2000). Optional referencePriceE18 is a positive decimal
+string representing the buyer's prior HBAR/USD price reference.
+
+CATALOG is an array of offerId and unitsPerBuyer. Quantities are unverified
+offchain catalog claims; savings compare against buyer-stated solo prices.
+Onchain offers do not independently establish either claim.
+
+The adapter checks chain 296, deployed code, and a fresh Supra price.
+Contract reads use one block number, with a final block-hash check.
+Missing, expired, active, cancelled, and already joined groups are skipped.
+Existing groups require additional member-level planning and are not
+supported in this version. Providers cannot join their own offers.
+
+OUTPUT includes the block snapshot, proposals, unmatched and expired
+request IDs, and skipped-offer reasons. It is created with owner-only
+permissions and will not overwrite an existing file. Each buyer must
+authorize their own deposit; eligibility and prices can change afterward.
+
+Adapter tests cover snapshot consistency, oracle failures, offer states,
+buyer eligibility, duplicate identifiers, movement limits, and expiry.
+
+## Verified live agent activation
+
+On October 1, 2026, the read-only agent evaluated live Hedera testnet
+offer 2 using block 41217274 and a fresh Supra HBAR/USD price. It produced
+one proposal for two buyers, with no unmatched or expired requests.
+
+Each buyer independently submitted a deposit of 2.11004864 HBAR.
+Activation locked 1.92003073 HBAR per buyer, with individual market
+movement limits of 300 basis points.
+
+- Contract: 0x9846D66b0EB16BB8aaF18eA789420c838583B6fc
+- Offer creation: 0xbfca1bdbf8151f07a052502f11a883f6dcda7b3f135cf6c8250ade25528d6ebc
+- Buyer A join: 0xcbb6673fc127db2daf33f43b66bb8fc309c3bb28f9f1fa4b9ca0384bdb0943d7
+- Buyer B join: 0x6deb1a896c8e32856e85bf1c509c5bbe348acf37587daec55fde7ef7fce1dd33
+- Activation: 0x9baec2d1e6656ba3112785fc464792c104bb76a07a7683df7b4feb3805e228bb
+- HCS topic: 0.0.10776777; sequence: 2
+- HCS transaction: 0.0.10775178@1790852973.184320587
+- Consensus timestamp: 1790852979.429476830
+- Proposal digest: 0x24676021ff7ba62f1e10bebc3064773417f82b27747657ac6243b2b82bb6a1f6
+
+The mirror message was verified, and the digest was recomputed from the
+private proposal. The current digest commits to offer ID, sorted buyer
+request IDs, unit USD price, and stated savings. It does not commit to
+the complete planning snapshot or every proposal field.
+
+The $0.60 comparison savings uses demo buyer-stated solo prices.
+Catalog service quantities remain unverified offchain claims.
+HCS records the proposal commitment and activation reference; it does
+not independently prove savings or service quality.
+
+This offer's verified flow currently ends at activation and HCS anchoring.
+Delivery, acceptance, and service redemption were previously demonstrated
+with offer 1.
+
+Validation: 75 tests passed; lint and production build passed;
+production dependency audit reported zero vulnerabilities.
