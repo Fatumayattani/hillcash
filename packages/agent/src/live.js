@@ -1,11 +1,12 @@
 import { planPurchases } from './match.js';
+import { verifyServiceTerms } from './terms.js';
 
 const address = /^0x[0-9a-fA-F]{40}$/;
 const service = /^0x[0-9a-fA-F]{64}$/;
 const positive = n => Number.isSafeInteger(n) && n > 0;
 
 /** Read-only adapter. Catalog quantities and buyer solo prices are offchain claims. */
-export async function planLivePurchases(requests, catalog, { provider, contract }) {
+export async function planLivePurchases(requests, catalog, { provider, contract, allowUnsignedDemo = false }) {
   if (!Array.isArray(requests) || !Array.isArray(catalog) || requests.length > 256 || catalog.length > 64)
     throw new TypeError('Expected bounded request and catalog arrays');
 
@@ -22,7 +23,7 @@ export async function planLivePurchases(requests, catalog, { provider, contract 
 
   const offerIds = new Set();
   for (const c of catalog) {
-    if (!c || !positive(c.offerId) || offerIds.has(c.offerId) || !positive(c.unitsPerBuyer))
+    if (!c || !positive(c.offerId) || offerIds.has(c.offerId) || (!c.terms && (!allowUnsignedDemo || !positive(c.unitsPerBuyer))))
       throw new TypeError('Invalid catalog or duplicate offer ID');
     offerIds.add(c.offerId);
   }
@@ -48,6 +49,7 @@ export async function planLivePurchases(requests, catalog, { provider, contract 
   const now = block.timestamp * 1000;
   const skipped = [];
   const offers = [];
+  const signed = new Map();
 
   for (const c of catalog) {
     const o = await contract.offers(c.offerId, { blockTag });
@@ -72,10 +74,14 @@ export async function planLivePurchases(requests, catalog, { provider, contract 
       continue;
     }
 
+    if (c.terms) signed.set(String(c.offerId), verifyServiceTerms(c, {
+      chainId: 296, contract: target, offerId: c.offerId,
+      offer: o, nowSeconds: block.timestamp
+    }));
     offers.push({
       id: String(c.offerId), provider: o.provider, serviceId: o.serviceId,
       unitUsdCents: Number(o.unitUsdCents), minimum: Number(o.minimum), capacity: 32,
-      joinDeadline: Number(o.joinDeadline) * 1000, unitsPerBuyer: c.unitsPerBuyer
+      joinDeadline: Number(o.joinDeadline) * 1000, unitsPerBuyer: signed.get(String(c.offerId))?.unitsPerBuyer ?? c.unitsPerBuyer
     });
   }
 
@@ -90,7 +96,8 @@ export async function planLivePurchases(requests, catalog, { provider, contract 
           r.serviceId.toLowerCase() !== o.serviceId.toLowerCase()) continue;
       const order = await contract.orders(o.id, r.buyer, { blockTag });
       if (order.deposited === 0n && !order.resolved)
-        candidates.push({ ...r, serviceId: o.serviceId });
+        candidates.push({ ...r, serviceId: o.serviceId,
+          soloUsdCents: signed.get(o.id)?.soloUsdCents ?? r.soloUsdCents });
     }
 
     const planned = planPurchases(candidates, [o], now, price);
@@ -100,8 +107,11 @@ export async function planLivePurchases(requests, catalog, { provider, contract 
 
       proposals.push({
         ...p, offerId: Number(p.offerId),
-        savingsBasis: 'buyer-stated-solo-price',
-        quantityBasis: 'unverified-catalog',
+        savingsBasis: signed.has(o.id)
+          ? 'provider-signed-solo-price' : 'buyer-stated-solo-price',
+        quantityBasis: signed.has(o.id)
+          ? 'provider-signed-quantity' : 'unverified-catalog',
+        serviceTerms: signed.get(o.id) ?? null,
         requiresBuyerAuthorization: true
       });
 

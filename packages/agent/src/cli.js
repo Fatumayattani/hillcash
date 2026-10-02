@@ -13,10 +13,10 @@ const abi = [
 async function main() {
   const args = process.argv.slice(2);
   if (args.length === 1 && args[0] === '--help') {
-    console.log('Usage: agent:plan <requests.json> <catalog.json> <private-output.json>');
+    console.log('Usage: agent:plan <requests.json> <catalog.json> <private-output.json> [--allow-unsigned-demo]');
     return;
   }
-  if (args.length !== 3)
+  if (args.length !== 3 && !(args.length === 4 && args[3] === '--allow-unsigned-demo'))
     throw new Error('Expected requests, catalog, and private output file paths; use --help');
 
   dotenv.config({ path: fileURLToPath(new URL('../../../.env', import.meta.url)) });
@@ -39,7 +39,7 @@ async function main() {
   const provider = new JsonRpcProvider(rpc);
   const contract = new Contract(target, abi, provider);
   try {
-    const result = await planLivePurchases(requests, catalog, { provider, contract });
+    const result = await planLivePurchases(requests, catalog, { provider, contract, allowUnsignedDemo: args[3] === '--allow-unsigned-demo' });
     fs.writeFileSync(args[2], JSON.stringify(result, null, 2) + '\n', {
       flag: 'wx', mode: 0o600
     });

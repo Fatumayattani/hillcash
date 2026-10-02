@@ -20,7 +20,8 @@
     "audit:topic": "npm run topic -w @hillcash/audit",
     "audit:anchor": "npm run anchor -w @hillcash/audit --",
     "start": "npm run start -w @hillcash/web --",
-    "agent:plan": "npm run plan -w @hillcash/agent --"
+    "agent:plan": "npm run plan -w @hillcash/agent --",
+    "provider:terms": "npm run sign:terms -w @hillcash/provider --"
   },
   "overrides": {
     "@grpc/grpc-js": "1.13.6",

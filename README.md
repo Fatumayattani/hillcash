@@ -176,32 +176,40 @@ testnet. The receipt's Refunded event matched the original deposit:
 ## Live agent proposals
 
 Run `npm run agent:plan -- REQUESTS CATALOG OUTPUT` with absolute JSON
-file paths. Keep buyer requests and proposal output outside the checkout.
-The runner reads the root .env and needs HEDERA_TESTNET_RPC_URL and
-HILLCASH_CONTRACT. It does not require private keys or submit transactions.
+paths. Keep buyer requests and proposal output outside the checkout.
+The runner needs HEDERA_TESTNET_RPC_URL and HILLCASH_CONTRACT.
+It requires no signing key and submits no transactions.
 
 REQUESTS is an array containing id, buyer, serviceId (bytes32 hex),
 units, maxUsdCents, soloUsdCents, expiresAt (Unix milliseconds), and
 maxMovementBps (1–2000). Optional referencePriceE18 is a positive decimal
-string representing the buyer's prior HBAR/USD price reference.
+string. Signed planning uses the provider-declared solo price rather
+than the request's solo price.
 
-CATALOG is an array of offerId and unitsPerBuyer. Quantities are unverified
-offchain catalog claims; savings compare against buyer-stated solo prices.
-Onchain offers do not independently establish either claim.
+Signed catalogs are required by default. Create one with
+`npm run provider:terms -- OFFER_ID UNITS_PER_BUYER SOLO_USD_CENTS OUTPUT`.
+The command uses HEDERA_PRIVATE_KEY locally and submits no transaction.
+It derives service ID, group price, and validity from the live offer.
 
-The adapter checks chain 296, deployed code, and a fresh Supra price.
-Contract reads use one block number, with a final block-hash check.
-Missing, expired, active, cancelled, and already joined groups are skipped.
-Existing groups require additional member-level planning and are not
-supported in this version. Providers cannot join their own offers.
+Each catalog entry contains offerId, terms, and an EIP-712 signature.
+Terms bind the offer, service, quantity, group price, solo price, expiry,
+chain, and contract. The planner verifies the signer against the onchain
+provider and rejects altered, mismatched, or expired declarations.
 
-OUTPUT includes the block snapshot, proposals, unmatched and expired
-request IDs, and skipped-offer reasons. It is created with owner-only
-permissions and will not overwrite an existing file. Each buyer must
-authorize their own deposit; eligibility and prices can change afterward.
+For explicitly unsigned fixtures, append `--allow-unsigned-demo` to
+the agent command. Those catalogs contain offerId and unitsPerBuyer;
+their quantities are unverified and savings use buyer-stated solo prices.
 
-Adapter tests cover snapshot consistency, oracle failures, offer states,
-buyer eligibility, duplicate identifiers, movement limits, and expiry.
+A provider signature establishes who declared the terms. It does not
+independently establish market value, service quality, or guaranteed savings.
+
+Reads use one block number with a final block-hash check. The adapter
+checks chain 296, deployed code, and a fresh Supra price. Existing groups
+with members are currently skipped. Providers cannot join their own offers.
+
+OUTPUT includes the snapshot, proposals, unmatched and expired request IDs,
+and skipped-offer reasons. It is created with owner-only permissions and
+will not overwrite an existing file. Each buyer authorizes their own deposit.
 
 ## Verified live agent activation
 
@@ -267,3 +275,33 @@ and redeemed one service unit for each buyer.
 This verifies the complete sample-provider workflow. It does not establish
 independent provider adoption, market-validated savings, or production readiness.
 Private tokens, ledgers, and buyer request files remain outside the repository.
+
+## Verified signed catalog selection
+
+On October 2, 2026, the live agent evaluated two Hedera testnet offers
+for the same service using provider-signed EIP-712 commercial terms.
+
+| Offer | Group price per buyer | Declared units | Selected |
+| --- | --- | --- | --- |
+| 3 | $0.25 | 100 | No |
+| 4 | $0.20 | 100 | Yes |
+
+- Offer 3 creation: 0x35dc3303d93c7b0e526c480562692bb0bc53ec75d8e154295dc4d348ad531e56
+- Offer 4 creation: 0x194f1e6b39249341c1c7365cb8736a22c1e14e8722abfdacf4761ae5aa1e0fd0
+- Planning block: 41252185
+- Result: one proposal for two buyers; no unmatched, expired, or skipped entries
+- Savings basis: provider-signed-solo-price
+- Quantity basis: provider-signed-quantity
+
+Each provider declaration specified a $0.50 solo price. The selected
+proposal calculated a $0.60 total comparison saving across two buyers.
+These are provider-declared demo prices, not independently verified
+market prices. Signatures authenticate declarations, not service quality.
+
+The signing commands submitted no blockchain transactions. The agent
+performed read-only planning; neither buyer deposited for these offers.
+
+Validation: all 102 tests passed, including 27 new signature and integration
+tests. Lint, build, CLI help, and whitespace checks passed.
+Production dependency audit reported zero vulnerabilities; the full audit
+still reported 20 development dependency findings.
