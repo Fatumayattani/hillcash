@@ -388,3 +388,19 @@ The queue coordinates one process; it is not a multi-process locking mechanism.
 Validation: 24 HTTP tests cover authentication, payload validation, byte
 boundaries, routing, concurrency, failure recovery, and response ordering.
 The full suite passed 159 tests, along with lint and production build.
+
+## Escrow safety verification
+
+The automated suite contains 201 passing tests: agent 61, provider 36,
+audit 39, and contracts 65.
+
+The escrow safety tests cover exact deadline boundaries, oracle freshness,
+movement limits, isolated orders, deposit conservation, tinybar rounding,
+failed payment rollback, retry behavior, and reentrant payment callbacks.
+
+PaymentActor.sol is an intentionally unrestricted test helper used to
+simulate hostile payment receivers. It is not a production component.
+
+Verification: npm test, npm run lint, npm run build, and git diff --check
+passed. These changes add tests without changing production escrow logic
+or requiring a new deployment.
