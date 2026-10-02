@@ -21,8 +21,25 @@ export async function walletContract() {
   if (!window.ethereum) throw new Error("Install or open an EVM wallet.");
   const provider = new BrowserProvider(window.ethereum);
   await provider.send("eth_requestAccounts", []);
-  const network = await provider.getNetwork();
-  if (network.chainId !== 296n) throw new Error("Switch your wallet to Hedera Testnet (chain 296).");
+  let chainId = await provider.send("eth_chainId", []);
+  if (BigInt(chainId) !== 296n) {
+    try {
+      await window.ethereum.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: "0x128" }]
+      });
+    } catch (error) {
+      const code = (error as { code?: number })?.code;
+      if (code === 4902)
+        throw new Error("Add Hedera Testnet (296) to this wallet, then try again.");
+      if (code === 4001)
+        throw new Error("Network switch was declined; select Hedera Testnet (296) to inspect your order.");
+      throw error;
+    }
+    chainId = await provider.send("eth_chainId", []);
+    if (BigInt(chainId) !== 296n)
+      throw new Error(`Wallet still reports chain ${BigInt(chainId).toString()} (${chainId}) after the switch; Hedera Testnet is 296 (0x128).`);
+  }
   const signer = await provider.getSigner();
   return { contract: new Contract(address, abi, signer), signer };
 }

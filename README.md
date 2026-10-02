@@ -4,6 +4,21 @@ Hillcash is an open source Scaffold-HBAR template for agent-assisted group purch
 
 **Status:** early testnet prototype. The first deployment (`0x765461D7d9466c9D36D8a60AB8B48D288Cb4Ebdf`) could not accept buyer deposits because Hedera testnet EVM execution exposed 8-decimal `msg.value`. The corrected contract (`0x9846D66b0EB16BB8aaF18eA789420c838583B6fc`) has a verified testnet flow through two joins, activation, delivery, buyer acceptance, provider payout, and sample service redemption. An outside provider, HCS testnet record, and independent external-template scaffold remain unverified. This prototype is unaudited and unsuitable for real-value commerce.
 
+## Dashboard workspaces
+
+The sidebar separates the local matching sandbox from Hedera testnet actions.
+**Escrow** reads any on-chain offer without a wallet, then inspects the
+connected wallet's individual deposit, delivery and settlement state.
+The Connect action requests Hedera Testnet (chain 296) from the wallet
+and verifies the reported chain before reading an order. Payment actions
+reread the order and simulate the contract call before wallet approval.
+
+**Provider** creates a testnet offer. Use `provider:terms` to sign its
+service quantity and comparison price before running the live agent.
+**Evidence** links to the recorded testnet transactions and HCS proof;
+it is a historical demonstration. **Sandbox** uses clearly labeled
+local example buyers and offers.
+
 ## Quick start
 
 Requires Node.js 20.18.3+, npm, an EVM wallet, and testnet HBAR for on-chain actions.
