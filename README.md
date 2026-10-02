@@ -404,3 +404,45 @@ simulate hostile payment receivers. It is not a production component.
 Verification: npm test, npm run lint, npm run build, and git diff --check
 passed. These changes add tests without changing production escrow logic
 or requiring a new deployment.
+
+## Verified signed purchase completion
+
+On October 2, 2026, the live agent selected offer 4 at USD 0.20 per buyer
+over a competing provider-signed offer at USD 0.25. Both offers declared
+100 service units per buyer and a USD 0.50 solo comparison price.
+The USD 0.60 group savings comparison is provider-declared, not an
+independently verified market saving.
+
+- Network: Hedera testnet, chain ID 296
+- Contract: 0x9846D66b0EB16BB8aaF18eA789420c838583B6fc
+- Signed planning block: 41252799
+- Activation: 0x34377b1300ff6df87296a5dfa4eb96d617f05aeb87d71f603156acefac32762c
+- HCS topic: 0.0.10776777, sequence 3, record version 2
+- Full-plan digest: 0x1e4e5e467895852106e1fc3b50d5198c1f78896846d3820ecd3504e1c0112793
+- HCS consensus timestamp: 1790925757.369773104
+
+The full-plan digest was recomputed locally and matched the published
+record retrieved from the mirror node.
+
+Delivery commitments:
+- Buyer A: 0xfe4d2f48f85f449c9464c6acea11514a9728360964cb675908d9726253b0545c
+- Buyer B: 0x6fbba110d413db12fc7b86ca358632cf6fd1c181abdec803f88ef16bdf07364d
+
+Acceptance transactions:
+- Buyer A: 0xee158117c478df1a9d378ba2cc9a723411f46e16c0bfbb9d7bd8a6e878d62fe5
+- Buyer B: 0x8f9281835800858d9074464115a961cfb1d9dce862b6f79d10c745692c732b93
+
+Each acceptance paid the provider 1.92817547 HBAR and returned
+0.19220428 HBAR of deposit surplus to the buyer, excluding transaction
+fees. Accepted events matched the locked dues and surplus amounts;
+both orders were accepted and resolved.
+
+Both buyers redeemed one unit through the hardened sample provider
+HTTP server, receiving HTTP 200, remaining quota 99, and
+"Hillcash sample computation 1/100".
+Redemptions were verified at 2026-10-02T08:33:54.142Z and
+2026-10-02T08:33:54.693Z respectively.
+
+This demonstrates the included sample provider. An independent outside
+provider remains unverified. Private tokens, signing keys, ledgers, and
+buyer request files remain outside the repository.
