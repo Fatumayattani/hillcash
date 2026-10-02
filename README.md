@@ -359,3 +359,32 @@ Offer 2 separately demonstrated completed delivery, settlement, and redemption.
 
 Validation: 135 tests passed; lint and production build passed.
 Production dependency audit reported zero vulnerabilities.
+
+## Provider HTTP validation
+
+The sample provider exposes POST /redeem on localhost. Requests require
+a bearer token containing 64 lowercase hexadecimal characters and a JSON
+object containing exactly offerId and buyer.
+
+| Result | HTTP status |
+| --- | --- |
+| Successful redemption | 200 |
+| Invalid payload or rejected redemption | 400 |
+| Missing or malformed bearer token | 401 |
+| Unsupported method or route | 404 |
+| Body exceeding 2048 bytes | 413 |
+
+Body limits count raw bytes, including multibyte UTF-8 input.
+Responses use JSON and Cache-Control: no-store. Internal redemption
+errors are replaced with a generic response.
+
+Redemptions are serialized within the provider process. A failed request
+does not block later requests. Successful responses follow ledger
+persistence; onchain acceptance checks remain required.
+
+The server configures 10-second request and header timeouts.
+The queue coordinates one process; it is not a multi-process locking mechanism.
+
+Validation: 24 HTTP tests cover authentication, payload validation, byte
+boundaries, routing, concurrency, failure recovery, and response ordering.
+The full suite passed 159 tests, along with lint and production build.
