@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { Wallet } from 'ethers';
+import { TERMS_TYPES, termsDomain } from '../src/terms.js';
 import { planLivePurchases } from '../src/live.js';
 
 const wallet = n => '0x' + n.toString(16).padStart(40, '0');
@@ -39,7 +41,7 @@ function fixture() {
     expiresAt: (timestamp + 1200) * 1000, maxMovementBps: 300
   }));
   const catalog = [{ offerId: 1, unitsPerBuyer: 100 }];
-  return { provider, contract, requests, catalog, offer, reads };
+  return { provider, contract, requests, catalog, offer, reads, allowUnsignedDemo: true };
 }
 
 const run = f => planLivePurchases(f.requests, f.catalog, f);
@@ -121,4 +123,52 @@ test('expired requests are reported separately', async () => {
   const f = fixture();
   f.requests[0].expiresAt = timestamp * 1000;
   assert.deepEqual((await run(f)).expired, ['buyer-1']);
+});
+
+test('unsigned catalog requires explicit demo mode', async () => {
+  const f = fixture();
+  f.allowUnsignedDemo = false;
+  await assert.rejects(run(f), /Invalid catalog/);
+});
+
+async function signedFixture() {
+  const f = fixture();
+  const signer = new Wallet('0x' + '11'.repeat(32));
+  f.allowUnsignedDemo = false;
+  f.offer.provider = signer.address;
+  const terms = {
+    offerId: 1, serviceId, unitsPerBuyer: 100,
+    unitUsdCents: 20, soloUsdCents: 40,
+    validUntil: timestamp + 600
+  };
+  f.catalog = [{
+    offerId: 1,
+    terms,
+    signature: await signer.signTypedData(
+      termsDomain(296, wallet(10)), TERMS_TYPES, terms
+    )
+  }];
+  return f;
+}
+
+test('live planner uses signed solo price rather than buyer comparison claims', async () => {
+  const f = await signedFixture();
+  f.requests.forEach(r => r.soloUsdCents = 10000);
+  const p = (await run(f)).proposals[0];
+  assert.equal(p.savedUsdCents, 40);
+  assert.equal(p.quantityBasis, 'provider-signed-quantity');
+  assert.equal(p.savingsBasis, 'provider-signed-solo-price');
+});
+
+test('unsigned quantity override cannot replace signed quantity', async () => {
+  const f = await signedFixture();
+  f.catalog[0].unitsPerBuyer = 999;
+  f.requests.forEach(r => r.units = 101);
+  assert.equal((await run(f)).proposals.length, 0);
+});
+
+test('live planning fails on modified signed terms', async () => {
+  const f = await signedFixture();
+  f.catalog[0].terms.soloUsdCents++;
+  await assert.rejects(run(f));
 });
