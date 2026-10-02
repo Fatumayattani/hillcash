@@ -233,9 +233,37 @@ Catalog service quantities remain unverified offchain claims.
 HCS records the proposal commitment and activation reference; it does
 not independently prove savings or service quality.
 
-This offer's verified flow currently ends at activation and HCS anchoring.
-Delivery, acceptance, and service redemption were previously demonstrated
-with offer 1.
+Offer 2 subsequently completed delivery, buyer acceptance, and sample
+service redemption for both buyers, as documented below.
 
 Validation: 75 tests passed; lint and production build passed;
 production dependency audit reported zero vulnerabilities.
+
+## Verified agent purchase completion
+
+On October 2, 2026, both buyers completed the agent-selected offer 2
+purchase on Hedera testnet.
+
+| Evidence | Buyer A | Buyer B |
+| --- | --- | --- |
+| Provider payment | 1.92003073 HBAR | 1.92003073 HBAR |
+| Deposit surplus returned | 0.19001791 HBAR | 0.19001791 HBAR |
+| Redemption HTTP status | 200 | 200 |
+| Remaining service units | 99 of 100 | 99 of 100 |
+
+Delivery transactions:
+- Buyer A: 0x646f7ef19f5cb80c80d4bfec159156ab76bc1f28b969c7204f2bcdc5e9c158f6
+- Buyer B: 0x7ec76795919dd38589394826a48ddf8ab0f197046b3207b9e51f697779de3606
+
+Acceptance transactions:
+- Buyer A: 0x592cc1bf00ee403dde88cd7344e7f8f6afc18a8e86a24b9e3f87f3e41bc892ff
+- Buyer B: 0x2582f053f34d11ec61fb24accbc804836d70fe2f22af2bf7bd675d4163fd9b44
+
+Private tokens were checked against onchain commitments before acceptance.
+Accepted events matched each locked payment and deposit surplus.
+The local sample provider then verified accepted onchain entitlements
+and redeemed one service unit for each buyer.
+
+This verifies the complete sample-provider workflow. It does not establish
+independent provider adoption, market-validated savings, or production readiness.
+Private tokens, ledgers, and buyer request files remain outside the repository.
