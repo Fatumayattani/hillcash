@@ -305,3 +305,57 @@ Validation: all 102 tests passed, including 27 new signature and integration
 tests. Lint, build, CLI help, and whitespace checks passed.
 Production dependency audit reported zero vulnerabilities; the full audit
 still reported 20 development dependency findings.
+
+## Full signed-plan audit commitments
+
+The audit command accepts either a legacy proposal (version 1) or a
+complete signed single-group plan (version 2). Existing records remain valid.
+
+New plans retain the provider signature in serviceTerms. Version 2
+revalidates it and commits to the full plan, including the planning
+snapshot, declared terms, buyer request IDs, reasoning, and activation
+reference. Object keys and selected buyer IDs are canonicalized.
+
+Before HCS submission, the anchor checks the historical planning block,
+onchain provider and offer fields, and exact Supra price and timestamp.
+It also requires a matching successful activation receipt.
+
+Only the public record and digest are submitted to HCS. The full plan,
+buyer request IDs, and commercial terms are not included in the message.
+
+Run `npm run audit:anchor -- FULL_PLAN_JSON ACTIVATION_TX` after activation.
+Unsigned demo plans are not accepted as version 2. Previously generated
+plans lacking signatures must be regenerated; keep their original files
+for their original version 1 evidence.
+
+The commitment preserves declared evidence. It does not independently
+prove market prices, service quality, or buyer-wallet authorization.
+
+## Verified version 2 audit
+
+On October 2, 2026, offer 4 completed two buyer joins and activation
+using a plan containing provider-signed commercial terms. The version 2
+anchor verified the historical offer and Supra snapshot before HCS submission.
+
+- Planning block: 41252799
+- Buyer A join: 0x82aaa89b39240f6f1e84d004f3f26447da866344a5bc0ec0cb58aa9834307caf
+- Buyer B join: 0x46af72679202cabc0ad239da314633b8e889b52c7b7eb8a5350c4dd9a9e25ee9
+- Deposit per buyer: 2.12037975 HBAR
+- Locked payment per buyer: 1.92817547 HBAR
+- Activation: 0x34377b1300ff6df87296a5dfa4eb96d617f05aeb87d71f603156acefac32762c
+- HCS topic: 0.0.10776777; sequence: 3
+- HCS transaction: 0.0.10775178@1790925750.069946576
+- Consensus timestamp: 1790925757.369773104
+- Full-plan digest: 0x1e4e5e467895852106e1fc3b50d5198c1f78896846d3820ecd3504e1c0112793
+
+The digest was recomputed from the private full plan and matched the
+complete published version 2 record retrieved through the mirror node.
+The public message contains the activation reference and commitment;
+the full plan and buyer request IDs remain local.
+
+This offer's verified lifecycle currently ends at activation and auditing.
+Both deposits remain in escrow pending acceptance or an eligible refund.
+Offer 2 separately demonstrated completed delivery, settlement, and redemption.
+
+Validation: 135 tests passed; lint and production build passed.
+Production dependency audit reported zero vulnerabilities.

@@ -74,10 +74,10 @@ export async function planLivePurchases(requests, catalog, { provider, contract,
       continue;
     }
 
-    if (c.terms) signed.set(String(c.offerId), verifyServiceTerms(c, {
+    if (c.terms) signed.set(String(c.offerId), { ...verifyServiceTerms(c, {
       chainId: 296, contract: target, offerId: c.offerId,
       offer: o, nowSeconds: block.timestamp
-    }));
+    }), signature: c.signature });
     offers.push({
       id: String(c.offerId), provider: o.provider, serviceId: o.serviceId,
       unitUsdCents: Number(o.unitUsdCents), minimum: Number(o.minimum), capacity: 32,
