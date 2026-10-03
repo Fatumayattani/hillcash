@@ -21,12 +21,16 @@
     "audit:anchor": "npm run anchor -w @hillcash/audit --",
     "start": "npm run start -w @hillcash/web --",
     "agent:plan": "npm run plan -w @hillcash/agent --",
-    "provider:terms": "npm run sign:terms -w @hillcash/provider --"
+    "provider:terms": "npm run sign:terms -w @hillcash/provider --",
+    "format": "prettier --write . --log-level warn"
   },
   "overrides": {
     "@grpc/grpc-js": "1.13.6",
     "ws@>=8 <9": "8.21.0",
     "postcss@>=8 <9": "8.5.28",
     "protobufjs@>=8 <9": "8.8.0"
+  },
+  "devDependencies": {
+    "prettier": "3.9.6"
   }
 }
