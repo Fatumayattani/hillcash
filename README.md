@@ -1,463 +1,129 @@
 # Hillcash
 
-Hillcash is an open source Scaffold-HBAR template for agent-assisted group purchasing of digital services. Buyers set individual USD caps and HBAR market movement limits; a deterministic matching agent proposes compatible groups; each buyer authorizes their own HBAR deposit. A Supra HBAR/USD feed determines the required deposit, snapshots the market price at each join, and checks each buyer's limit when the provider activates the group. A provider commits a hash of each buyer's individual entitlement. A buyer's explicit acceptance releases that buyer's payment; unresolved orders can be refunded after the delivery deadline.
+Hillcash is an open source Scaffold-HBAR template for group purchasing of digital services. A deterministic agent matches compatible buyer requests to provider-signed offers, while every buyer authorizes their own HBAR deposit. Hedera smart contracts handle escrow and settlement, a Supra HBAR/USD feed guards prices, and Hedera Consensus Service (HCS) records a digest of the selected purchase plan.
 
-**Status:** early testnet prototype. The first deployment (`0x765461D7d9466c9D36D8a60AB8B48D288Cb4Ebdf`) could not accept buyer deposits because Hedera testnet EVM execution exposed 8-decimal `msg.value`. The corrected contract (`0x9846D66b0EB16BB8aaF18eA789420c838583B6fc`) has a verified testnet flow through two joins, activation, delivery, buyer acceptance, provider payout, and sample service redemption. An outside provider, HCS testnet record, and independent external-template scaffold remain unverified. This prototype is unaudited and unsuitable for real-value commerce.
+The template includes a sample metered service, a sidebar dashboard, and a local matching sandbox. It requires no paid AI API.
 
-## Dashboard workspaces
+## Start from the template
 
-The sidebar separates the local matching sandbox from Hedera testnet actions.
-**Escrow** reads any on-chain offer without a wallet, then inspects the
-connected wallet's individual deposit, delivery and settlement state.
-The Connect action requests Hedera Testnet (chain 296) from the wallet
-and verifies the reported chain before reading an order. Payment actions
-reread the order and simulate the contract call before wallet approval.
+Requires Node.js 20.18.3+ and npm. Scaffold-HBAR CLI 0.4.1 also checks for Yarn when npm is selected. If Yarn is unavailable, run `corepack prepare yarn@stable --activate`.
 
-**Provider** creates a testnet offer. Use `provider:terms` to sign its
-service quantity and comparison price before running the live agent.
-**Evidence** links to the recorded testnet transactions and HCS proof;
-it is a historical demonstration. **Sandbox** uses clearly labeled
-local example buyers and offers.
-
-## Quick start
-
-Requires Node.js 20.18.3+, npm, an EVM wallet, and testnet HBAR for on-chain actions.
+From a fresh directory:
 
 ```bash
-npm install
+npm create scaffold-hbar -- --template Fatumayattani/hillcash
+cd YOUR_PROJECT_NAME
 npm test
-npm run contracts:compile
 npm run lint
 npm run build
 npm run dev
 ```
 
-Open http://localhost:3000. Use **Load example marketplace** to try local matching; those accounts and offers are fixtures. Local planning requires no wallet or paid AI API. The agent's policy is deterministic and testable; a language model is not trusted with spending authorization.
+Choose **Testnet** when prompted, then open http://localhost:3000. Click **Load example marketplace** to try local matching without a wallet or blockchain transaction. The sandbox uses example buyers, offers, and stated solo prices.
 
-## Scaffold setup and verification
+On October 3, 2026, the exact external scaffold command completed installation, formatting, and Git initialization. The fresh project passed **201 tests** (agent 61, provider 36, audit 39, contracts 65), lint, and build. `npm audit --omit=dev` reported zero production dependency vulnerabilities. A separate fresh-scaffold check served the production page with HTTP 200.
 
-Scaffold-HBAR CLI 0.4.1 requires Yarn to be available even when this
-template selects npm. Enable it with Corepack before scaffolding.
+## How a purchase works
 
-Create a copy outside an existing checkout with:
-`npx create-scaffold-hbar@0.4.1 hillcash-fresh --template Fatumayattani/hillcash --frontend nextjs-app --solidity-framework hardhat --network testnet --yes --skip-install --skip-hedera-skills`
+1. A provider creates an on-chain offer and signs its service quantity and comparison price.
+2. The read-only agent checks live offers and proposes a compatible group. It cannot deposit or accept on a buyer’s behalf.
+3. Each buyer independently approves a deposit and sets a USD cap and HBAR price movement limit.
+4. The provider activates the group once enough buyers have joined. The contract checks a fresh Supra price and every buyer’s limit.
+5. The provider commits a hash of each buyer’s private entitlement. Each buyer verifies their token and decides whether to accept.
+6. Acceptance pays the provider for that buyer’s order and returns unused deposit. Eligible unresolved orders can instead be refunded.
 
-Enter `hillcash-fresh`, then run `npm ci`, `npm test`, `npm run lint`,
-`npm run build`, and `npm run dev`. For a production server, run
-`npm run build` followed by `npm start`.
+The contract rejects stale oracle data, insufficient deposits, and activation outside any buyer’s movement limit. It supports up to 32 buyers per offer. Wallet quotes use 18-decimal RPC units; the deployed contract accounts for Hedera testnet’s observed 8-decimal native execution units.
 
-On October 1, 2026, a fresh external scaffold passed installation,
-54 tests, TypeScript checks, and a production build. Its production
-server returned HTTP 200 with Hillcash's page without copying an existing
-.env. Local example matching still uses fixtures.
+## Inspect the testnet example
 
-### Dependency audit
+Copy `.env.example` to `.env` and set:
 
-The updated dependency resolution passed `npm audit --omit=dev` with
-zero reported vulnerabilities. Root overrides select patched gRPC,
-WebSocket, PostCSS, and protobuf releases.
+```dotenv
+NEXT_PUBLIC_HILLCASH_CONTRACT=0x9846D66b0EB16BB8aaF18eA789420c838583B6fc
+```
 
-The full audit still reports 20 development-dependency findings,
-including 7 high severity. Those require further remediation.
-A clean runtime audit is not a security audit of the escrow or product.
+Restart `npm run dev`, open **Escrow**, and inspect offer **4**. Reading an offer does not require a wallet. Offer 4 is a completed historical purchase on Hedera Testnet, chain ID 296; use **Evidence** for its transaction links.
 
-## Hedera testnet
-
-1. Copy `.env.example` to `.env` and configure `HEDERA_PRIVATE_KEY` for a **testnet-only funded account**. Never commit `.env`.
-2. Run `npm run oracle:check`. It reads pair **432** from Supra's documented Hedera testnet push-oracle holder and fails if the price is absent or older than two hours. Do this before deployment. The published holder address is `0x6Cd59830AAD978446e6cc7f6cc173aF7656Fb917`; its documented update frequency is one hour. A live read on September 29, 2026 returned an 18-decimal price and a **millisecond** Unix timestamp. The checker and contract use that timestamp format.
-3. Run `npm run deploy:testnet -w @hillcash/contracts` and record the resulting contract and transaction hash.
-4. Set `NEXT_PUBLIC_HILLCASH_CONTRACT` in `.env`; restart `npm run dev`.
-5. With a wallet on Hedera Testnet chain 296, create an offer, then have two independent buyer wallets join. Activate before the join deadline. The provider issues an individual entitlement as shown below; the buyer checks its private token in the dashboard before accepting. After the delivery deadline, unresolved buyers may refund.
-
-The UI exposes offer creation, joining, activation, token commitment checking, acceptance and refund. Do not share entitlement secrets onchain: commit only a hash; deliver the secret privately. The contract does not arbitrate whether delivered content is valid.
-
-At join, a buyer sets a market movement tolerance from 0.01% to 20%. The contract stores the fresh Supra HBAR/USD price for that buyer. Activation compares a new fresh price against **each buyer's own snapshot**, rejects either direction beyond their limit, and still requires every deposit to cover the new HBAR quote. This is a veto on the pooled activation: if any buyer is outside their limit, the whole group waits until the price returns inside the limits or the join deadline passes. After that deadline, every buyer can reclaim an unactivated deposit. The matching library can filter requests with `referencePriceE18` and `maxMovementBps` against a supplied fresh `marketPriceE18`; that check is advisory and does not replace the contract. The local fixture UI does not fetch a feed for its simulated requests. Earlier contract deployments must be redeployed to use this version.
-
-### Live testnet evidence (September 29, 2026)
-
-- Corrected deployment: `0x9846D66b0EB16BB8aaF18eA789420c838583B6fc`; transaction `0x761c0898cd04942111bd2b743d95ec11f58cabac97cc811831d49a663954d2f8`; `nativeDecimals=8`.
-- Offer 1: `0xb85944dc5e826a99a360eb02174bed45cce0ff0d66384363ab643679689fc454`.
-- Buyer joins: `0xf8b8ddd0d35303fc85a7a4525b78bc19b0f1bebb477a26c77a3c9605b9d06f12` and `0xa1f59ffe4d43f077db4e742cabe138ad06dd123ad023f462a491f47e74869708`.
-- Activation: `0xab59718a1f93dcf9923717e3a9ca6e80bbb4dd87f89ec2df50cd7bb0d3939baf`.
-- Buyer A delivery commitment: `0xcba0256dda1cd10f6a80bde237668991af0b2ed2e8fcda988bb5358451e570b9`.
-- Buyer A acceptance: `0xa7696e96e467ab6f18c435123bacaa9f7c404ef2048b5b6b25173a8f9567c7a4`. The provider balance increased by exactly 4.21862608 HBAR.
-- The local sample service returned HTTP 200 with 99 uses remaining after one redemption. This response is local evidence, not an on-chain transaction.
-
-Buyer B remains unresolved pending delivery or refund after the delivery deadline. Private tokens are not included in this repository.
-
-### Sample provider
-
-Use the **same provider wallet** that created the offer. In `.env`, set `HILLCASH_CONTRACT` to your deployment and `HEDERA_PRIVATE_KEY` to that provider wallet's testnet key. After activation:
-
-The sample issuer uses a testnet legacy gas-price default of `2000000000000` wei. Set `HILLCASH_GAS_PRICE_WEI` in `.env` if the network minimum changes.
+To deploy your own contract, use a funded **testnet-only** account. Set `HEDERA_PRIVATE_KEY` in the ignored `.env`, then run:
 
 ```bash
-npm run issue -w @hillcash/provider -- 1 0xBUYER_WALLET_ADDRESS 100
+npm run oracle:check
+npm run deploy:testnet -w @hillcash/contracts
+```
+
+Set `HILLCASH_CONTRACT` and `NEXT_PUBLIC_HILLCASH_CONTRACT` to the new address and restart the app. Wallet actions require an EVM wallet connected to Hedera Testnet and test HBAR. Never commit `.env`, buyer requests, entitlement tokens, or provider ledgers.
+
+## Agent, provider, and HCS tools
+
+The planner reads buyer requests and signed provider terms without a signing key or transaction:
+
+```bash
+npm run agent:plan -- REQUESTS_JSON CATALOG_JSON OUTPUT_JSON
+```
+
+`REQUESTS_JSON` is an array of requests with `id`, `buyer`, `serviceId` (bytes32 hex), `units`, `maxUsdCents`, `soloUsdCents`, `expiresAt` (Unix milliseconds), and `maxMovementBps` (1–2000). An optional `referencePriceE18` is a positive decimal string. Keep requests and the resulting plan outside the repository.
+
+The provider signs commercial terms for an existing on-chain offer with:
+
+```bash
+npm run provider:terms -- OFFER_ID UNITS_PER_BUYER SOLO_USD_CENTS OUTPUT_JSON
+```
+
+Signed catalog entries bind the offer, provider, service, quantity, group price, solo comparison price, expiry, chain, and contract. The planner verifies the signature against the on-chain provider and rejects altered, mismatched, or expired terms. A signature authenticates a declaration; it does not prove service quality or a market discount.
+
+After activation, the provider issues an individual entitlement and starts the sample service:
+
+```bash
+npm run provider:issue -- OFFER_ID BUYER_ADDRESS 100
 npm run provider:serve
 ```
 
-The first command sends `commitDelivery`, persists an entitlement record in the ignored `.provider-data.json`, and prints a unique token **once**. Copy it to the corresponding buyer through a private channel. The buyer checks its hash against the contract in the UI, then explicitly accepts payment before redeeming the sample service:
+Deliver the printed private token to the buyer privately. Once that buyer accepts on-chain, they can redeem a unit:
 
 ```bash
 curl -X POST http://127.0.0.1:3001/redeem \
   -H 'content-type: application/json' \
   -H 'authorization: Bearer BUYER_PRIVATE_TOKEN' \
-  -d '{"offerId":1,"buyer":"0xBUYER_WALLET_ADDRESS"}'
+  -d '{"offerId":4,"buyer":"0xBUYER_WALLET_ADDRESS"}'
 ```
 
-The sample provider listens only on localhost, tracks usage in a private local file, never saves plaintext tokens, and checks onchain delivery and acceptance for each call. It is a single-process demonstration; it has no hosted authentication, high-availability database, or concurrency across multiple server instances. Tokens stop working after a refund. The example service returns a usage receipt rather than supplying a paid third-party API.
+The sample provider checks on-chain acceptance and keeps its usage ledger locally. It is a single-process demonstration.
 
-### Verified HCS testnet record
-
-The manual testnet activation for offer 1 was anchored to HCS topic
-[`0.0.10776777`](https://testnet.mirrornode.hedera.com/api/v1/topics/0.0.10776777/messages/1),
-sequence 1, in transaction `0.0.10775178@1790686424.381005862`. The public
-mirror returned digest
-`0x1b3620920fca0b5591a7caac840ae75501aaedea68f1483677d8a71e339e4451`
-and activation transaction
-`0xab59718a1f93dcf9923717e3a9ca6e80bbb4dd87f89ec2df50cd7bb0d3939baf`.
-
-This record documents a **manual testnet flow**, with `savedUsdCents: 0`.
-It does not establish an agent-generated match, an independently verified
-discount, or successful delivery to both buyers. The proposal stays local;
-only its digest and the activation reference were published to HCS.
-
-### HCS decision audit
-
-Set `HEDERA_OPERATOR_ID` and `HILLCASH_CONTRACT` in `.env`, then create an HCS topic. The client uses `HEDERA_PRIVATE_KEY` by default; set `HEDERA_OPERATOR_KEY` only for a different funded ECDSA account. Look up the numeric account ID from the operator's EVM address at the Hedera testnet Mirror Node.
+For a new HCS topic, configure `HEDERA_OPERATOR_ID`, then run `npm run audit:topic` and set `HILLCASH_HCS_TOPIC_ID` to the result. After activating a signed group, anchor its private full plan with:
 
 ```bash
-npm run audit:topic
+npm run audit:anchor -- FULL_PLAN_JSON ACTIVATION_TX
 ```
 
-Set `HILLCASH_HCS_TOPIC_ID` to the printed topic ID. Write a JSON proposal file containing the numeric onchain `offerId`, an array of at least two unique buyer **request IDs**, `unitUsdCents`, and `savedUsdCents`. After activation, anchor it:
-
-```bash
-npm run anchor -w @hillcash/audit -- path/to/proposal.json 0xACTIVATION_TRANSACTION_HASH
-```
-
-The audit script first checks that the transaction succeeded at the configured Hillcash contract and emitted `Activated` for that offer. It then publishes only a digest, offer ID, contract address, and activation transaction hash to HCS. The digest is a timestamped commitment to the supplied decision data; it does **not** independently prove the buyer's stated solo price or a provider's actual discount. Do not include names, prompts, or tokens in a proposal file intended for sharing.
-
-The `oracle:check` command requires access to a Hedera testnet JSON-RPC endpoint. A blocked network cannot establish that the feed is live. Oracle deployment documentation alone is insufficient validation.
-
-## Purchase lifecycle
-
-| Stage | Contract invariant |
-| --- | --- |
-| Create | Provider chooses service hash, USD cents price, minimum 2–32, and deadlines. |
-| Join | Oracle price is fresh; buyer's USD cap covers offer; HBAR deposit covers price at that moment. |
-| Activate | Minimum reached; a fresh rate is used again and every deposit covers that rate. Otherwise no activation. |
-| Deliver | Provider commits a nonzero hash for an individual buyer before the delivery deadline. |
-| Accept | Only buyer accepts; provider receives due HBAR and buyer receives unused deposit. |
-| Refund | Buyer can reclaim the full unresolved deposit after an open offer expires, after delivery expires, or after provider cancellation. |
-
-**Price movement:** if HBAR falls between join and activation, activation reverts until buyers have enough deposits. There is currently no top-up method, so that offer eventually expires and buyers refund. That is a deliberate fail-closed first version, but poor conversion under volatile prices.
-
-**Units:** Supra's observed `HBAR_USD` value uses 18 decimals. A live Hedera testnet recorder transaction (`0xdd346d86f73828a19082a93f3d1c5fbf57bf6a2bbd9f5a5b617792236459d43d`) stored `msg.value == 1000000` for a wallet call carrying 0.01 HBAR (`10000000000000000` RPC wei): the EVM execution used 8-decimal native units. The deploy script passes native precision 8; local Ethereum tests use 18. `quoteWei` still returns an 18-decimal wallet amount rounded up to the next native unit. Joins, locked dues, payouts, and refunds use the configured EVM native precision. This observed testnet behavior differs from the current wording at https://docs.hedera.com/evm/differences/hbar-decimals; live execution takes priority for this template. The discrepancy should be rechecked after network or relay upgrades.
-
-## Structure
-
-- `packages/contracts`: Solidity escrow, Supra interface, mock feed, Hardhat tests, deployment and live oracle checker.
-- `packages/agent`: deterministic matching policy with Node tests. It never holds buyer keys.
-- `packages/web`: Next.js buyer/provider planning interface and optional testnet wallet transactions.
-- `packages/provider`: individual token issuance, chain-gated sample redemption, and a private local usage ledger.
-- `packages/audit`: HCS topic and audit submission tools; verifies a matching contract activation first.
-- `.harness`: incremental feature brief and deterministic validator for Hedera Harness.
-
-The sample provider supplies individual entitlements and a local redemption API. Connecting external providers requires their participation, authenticated offers, and a reliable delivery channel. The HCS tool has been exercised on testnet for one manual activation; this does not verify an agent-generated match. Buyers can check a token's onchain commitment before paying; that check does not prove the provider will remain online or deliver a valuable service. This prototype is unsuitable for real-value commerce until provider reliability and dispute handling are resolved.
-
-## External template gate
-
-Once published as a public GitHub repository, validate the real CLI path from a fresh directory:
-
-```bash
-npm create scaffold-hbar@latest --template YOUR_GITHUB_USER/hillcash
-```
-
-The bounty requires a successful external-template scaffold, clean install/lint/build/boot, valid `template.json`, README and AGENTS, MIT license, and a verifiable Hedera testnet transaction. These have **not** all been checked yet. Repository docs: https://hedera.com/blog/scaffold-hbar-template-bounty/. The template author must submit the Harness spec and validators if using Harness.
-
-Supra interface and pair documentation: https://docs.supra.com/oracles/data-feeds/push-oracle and https://docs.supra.com/oracles/data-feeds/data-feeds-index. Hedera testnet address: https://docs.supra.com/oracles/data-feeds/push-oracle/networks.
-
-## Verified testnet refund
-
-Offer 1's expired, unaccepted Buyer B order was refunded on Hedera
-testnet. The receipt's Refunded event matched the original deposit:
-4.64048869 HBAR. After refund, resolved was true and accepted was false.
-
-- Contract: 0x9846D66b0EB16BB8aaF18eA789420c838583B6fc
-- Transaction: 0xf137ff047a3a7981c709d522803ccac28cd7ddf777e1cd5529635d00262b9bf4
-- Verification date: 2026-10-01
-
-## Live agent proposals
-
-Run `npm run agent:plan -- REQUESTS CATALOG OUTPUT` with absolute JSON
-paths. Keep buyer requests and proposal output outside the checkout.
-The runner needs HEDERA_TESTNET_RPC_URL and HILLCASH_CONTRACT.
-It requires no signing key and submits no transactions.
-
-REQUESTS is an array containing id, buyer, serviceId (bytes32 hex),
-units, maxUsdCents, soloUsdCents, expiresAt (Unix milliseconds), and
-maxMovementBps (1–2000). Optional referencePriceE18 is a positive decimal
-string. Signed planning uses the provider-declared solo price rather
-than the request's solo price.
-
-Signed catalogs are required by default. Create one with
-`npm run provider:terms -- OFFER_ID UNITS_PER_BUYER SOLO_USD_CENTS OUTPUT`.
-The command uses HEDERA_PRIVATE_KEY locally and submits no transaction.
-It derives service ID, group price, and validity from the live offer.
-
-Each catalog entry contains offerId, terms, and an EIP-712 signature.
-Terms bind the offer, service, quantity, group price, solo price, expiry,
-chain, and contract. The planner verifies the signer against the onchain
-provider and rejects altered, mismatched, or expired declarations.
-
-For explicitly unsigned fixtures, append `--allow-unsigned-demo` to
-the agent command. Those catalogs contain offerId and unitsPerBuyer;
-their quantities are unverified and savings use buyer-stated solo prices.
-
-A provider signature establishes who declared the terms. It does not
-independently establish market value, service quality, or guaranteed savings.
-
-Reads use one block number with a final block-hash check. The adapter
-checks chain 296, deployed code, and a fresh Supra price. Existing groups
-with members are currently skipped. Providers cannot join their own offers.
-
-OUTPUT includes the snapshot, proposals, unmatched and expired request IDs,
-and skipped-offer reasons. It is created with owner-only permissions and
-will not overwrite an existing file. Each buyer authorizes their own deposit.
-
-## Verified live agent activation
-
-On October 1, 2026, the read-only agent evaluated live Hedera testnet
-offer 2 using block 41217274 and a fresh Supra HBAR/USD price. It produced
-one proposal for two buyers, with no unmatched or expired requests.
-
-Each buyer independently submitted a deposit of 2.11004864 HBAR.
-Activation locked 1.92003073 HBAR per buyer, with individual market
-movement limits of 300 basis points.
-
-- Contract: 0x9846D66b0EB16BB8aaF18eA789420c838583B6fc
-- Offer creation: 0xbfca1bdbf8151f07a052502f11a883f6dcda7b3f135cf6c8250ade25528d6ebc
-- Buyer A join: 0xcbb6673fc127db2daf33f43b66bb8fc309c3bb28f9f1fa4b9ca0384bdb0943d7
-- Buyer B join: 0x6deb1a896c8e32856e85bf1c509c5bbe348acf37587daec55fde7ef7fce1dd33
-- Activation: 0x9baec2d1e6656ba3112785fc464792c104bb76a07a7683df7b4feb3805e228bb
-- HCS topic: 0.0.10776777; sequence: 2
-- HCS transaction: 0.0.10775178@1790852973.184320587
-- Consensus timestamp: 1790852979.429476830
-- Proposal digest: 0x24676021ff7ba62f1e10bebc3064773417f82b27747657ac6243b2b82bb6a1f6
-
-The mirror message was verified, and the digest was recomputed from the
-private proposal. The current digest commits to offer ID, sorted buyer
-request IDs, unit USD price, and stated savings. It does not commit to
-the complete planning snapshot or every proposal field.
-
-The $0.60 comparison savings uses demo buyer-stated solo prices.
-Catalog service quantities remain unverified offchain claims.
-HCS records the proposal commitment and activation reference; it does
-not independently prove savings or service quality.
-
-Offer 2 subsequently completed delivery, buyer acceptance, and sample
-service redemption for both buyers, as documented below.
-
-Validation: 75 tests passed; lint and production build passed;
-production dependency audit reported zero vulnerabilities.
-
-## Verified agent purchase completion
-
-On October 2, 2026, both buyers completed the agent-selected offer 2
-purchase on Hedera testnet.
-
-| Evidence | Buyer A | Buyer B |
-| --- | --- | --- |
-| Provider payment | 1.92003073 HBAR | 1.92003073 HBAR |
-| Deposit surplus returned | 0.19001791 HBAR | 0.19001791 HBAR |
-| Redemption HTTP status | 200 | 200 |
-| Remaining service units | 99 of 100 | 99 of 100 |
-
-Delivery transactions:
-- Buyer A: 0x646f7ef19f5cb80c80d4bfec159156ab76bc1f28b969c7204f2bcdc5e9c158f6
-- Buyer B: 0x7ec76795919dd38589394826a48ddf8ab0f197046b3207b9e51f697779de3606
-
-Acceptance transactions:
-- Buyer A: 0x592cc1bf00ee403dde88cd7344e7f8f6afc18a8e86a24b9e3f87f3e41bc892ff
-- Buyer B: 0x2582f053f34d11ec61fb24accbc804836d70fe2f22af2bf7bd675d4163fd9b44
-
-Private tokens were checked against onchain commitments before acceptance.
-Accepted events matched each locked payment and deposit surplus.
-The local sample provider then verified accepted onchain entitlements
-and redeemed one service unit for each buyer.
-
-This verifies the complete sample-provider workflow. It does not establish
-independent provider adoption, market-validated savings, or production readiness.
-Private tokens, ledgers, and buyer request files remain outside the repository.
-
-## Verified signed catalog selection
-
-On October 2, 2026, the live agent evaluated two Hedera testnet offers
-for the same service using provider-signed EIP-712 commercial terms.
-
-| Offer | Group price per buyer | Declared units | Selected |
-| --- | --- | --- | --- |
-| 3 | $0.25 | 100 | No |
-| 4 | $0.20 | 100 | Yes |
-
-- Offer 3 creation: 0x35dc3303d93c7b0e526c480562692bb0bc53ec75d8e154295dc4d348ad531e56
-- Offer 4 creation: 0x194f1e6b39249341c1c7365cb8736a22c1e14e8722abfdacf4761ae5aa1e0fd0
-- Planning block: 41252185
-- Result: one proposal for two buyers; no unmatched, expired, or skipped entries
-- Savings basis: provider-signed-solo-price
-- Quantity basis: provider-signed-quantity
-
-Each provider declaration specified a $0.50 solo price. The selected
-proposal calculated a $0.60 total comparison saving across two buyers.
-These are provider-declared demo prices, not independently verified
-market prices. Signatures authenticate declarations, not service quality.
-
-The signing commands submitted no blockchain transactions. The agent
-performed read-only planning; neither buyer deposited for these offers.
-
-Validation: all 102 tests passed, including 27 new signature and integration
-tests. Lint, build, CLI help, and whitespace checks passed.
-Production dependency audit reported zero vulnerabilities; the full audit
-still reported 20 development dependency findings.
-
-## Full signed-plan audit commitments
-
-The audit command accepts either a legacy proposal (version 1) or a
-complete signed single-group plan (version 2). Existing records remain valid.
-
-New plans retain the provider signature in serviceTerms. Version 2
-revalidates it and commits to the full plan, including the planning
-snapshot, declared terms, buyer request IDs, reasoning, and activation
-reference. Object keys and selected buyer IDs are canonicalized.
-
-Before HCS submission, the anchor checks the historical planning block,
-onchain provider and offer fields, and exact Supra price and timestamp.
-It also requires a matching successful activation receipt.
-
-Only the public record and digest are submitted to HCS. The full plan,
-buyer request IDs, and commercial terms are not included in the message.
-
-Run `npm run audit:anchor -- FULL_PLAN_JSON ACTIVATION_TX` after activation.
-Unsigned demo plans are not accepted as version 2. Previously generated
-plans lacking signatures must be regenerated; keep their original files
-for their original version 1 evidence.
-
-The commitment preserves declared evidence. It does not independently
-prove market prices, service quality, or buyer-wallet authorization.
-
-## Verified version 2 audit
-
-On October 2, 2026, offer 4 completed two buyer joins and activation
-using a plan containing provider-signed commercial terms. The version 2
-anchor verified the historical offer and Supra snapshot before HCS submission.
-
-- Planning block: 41252799
-- Buyer A join: 0x82aaa89b39240f6f1e84d004f3f26447da866344a5bc0ec0cb58aa9834307caf
-- Buyer B join: 0x46af72679202cabc0ad239da314633b8e889b52c7b7eb8a5350c4dd9a9e25ee9
-- Deposit per buyer: 2.12037975 HBAR
-- Locked payment per buyer: 1.92817547 HBAR
-- Activation: 0x34377b1300ff6df87296a5dfa4eb96d617f05aeb87d71f603156acefac32762c
-- HCS topic: 0.0.10776777; sequence: 3
-- HCS transaction: 0.0.10775178@1790925750.069946576
-- Consensus timestamp: 1790925757.369773104
-- Full-plan digest: 0x1e4e5e467895852106e1fc3b50d5198c1f78896846d3820ecd3504e1c0112793
-
-The digest was recomputed from the private full plan and matched the
-complete published version 2 record retrieved through the mirror node.
-The public message contains the activation reference and commitment;
-the full plan and buyer request IDs remain local.
-
-This offer's verified lifecycle currently ends at activation and auditing.
-Both deposits remain in escrow pending acceptance or an eligible refund.
-Offer 2 separately demonstrated completed delivery, settlement, and redemption.
-
-Validation: 135 tests passed; lint and production build passed.
-Production dependency audit reported zero vulnerabilities.
-
-## Provider HTTP validation
-
-The sample provider exposes POST /redeem on localhost. Requests require
-a bearer token containing 64 lowercase hexadecimal characters and a JSON
-object containing exactly offerId and buyer.
-
-| Result | HTTP status |
-| --- | --- |
-| Successful redemption | 200 |
-| Invalid payload or rejected redemption | 400 |
-| Missing or malformed bearer token | 401 |
-| Unsupported method or route | 404 |
-| Body exceeding 2048 bytes | 413 |
-
-Body limits count raw bytes, including multibyte UTF-8 input.
-Responses use JSON and Cache-Control: no-store. Internal redemption
-errors are replaced with a generic response.
-
-Redemptions are serialized within the provider process. A failed request
-does not block later requests. Successful responses follow ledger
-persistence; onchain acceptance checks remain required.
-
-The server configures 10-second request and header timeouts.
-The queue coordinates one process; it is not a multi-process locking mechanism.
-
-Validation: 24 HTTP tests cover authentication, payload validation, byte
-boundaries, routing, concurrency, failure recovery, and response ordering.
-The full suite passed 159 tests, along with lint and production build.
-
-## Escrow safety verification
-
-The automated suite contains 201 passing tests: agent 61, provider 36,
-audit 39, and contracts 65.
-
-The escrow safety tests cover exact deadline boundaries, oracle freshness,
-movement limits, isolated orders, deposit conservation, tinybar rounding,
-failed payment rollback, retry behavior, and reentrant payment callbacks.
-
-PaymentActor.sol is an intentionally unrestricted test helper used to
-simulate hostile payment receivers. It is not a production component.
-
-Verification: npm test, npm run lint, npm run build, and git diff --check
-passed. These changes add tests without changing production escrow logic
-or requiring a new deployment.
+The audit tool verifies the historical planning snapshot and matching successful activation before submitting the public record. HCS receives the plan digest and activation reference, not buyer IDs, private tokens, or the full plan.
 
 ## Verified signed purchase completion
 
-On October 2, 2026, the live agent selected offer 4 at USD 0.20 per buyer
-over a competing provider-signed offer at USD 0.25. Both offers declared
-100 service units per buyer and a USD 0.50 solo comparison price.
-The USD 0.60 group savings comparison is provider-declared, not an
-independently verified market saving.
+On October 2, 2026, the agent selected provider-signed offer **4** at **$0.20 per buyer** over a competing **$0.25** offer. Both offers declared 100 units of the sample service and a $0.50 solo comparison price. The calculated $0.60 total group saving is **provider-declared**, not an independently measured market saving.
 
-- Network: Hedera testnet, chain ID 296
-- Contract: 0x9846D66b0EB16BB8aaF18eA789420c838583B6fc
-- Signed planning block: 41252799
-- Activation: 0x34377b1300ff6df87296a5dfa4eb96d617f05aeb87d71f603156acefac32762c
-- HCS topic: 0.0.10776777, sequence 3, record version 2
-- Full-plan digest: 0x1e4e5e467895852106e1fc3b50d5198c1f78896846d3820ecd3504e1c0112793
-- HCS consensus timestamp: 1790925757.369773104
+| Hedera testnet evidence | Link |
+| --- | --- |
+| Contract deployment | [Transaction](https://testnet.mirrornode.hedera.com/api/v1/contracts/results/0x761c0898cd04942111bd2b743d95ec11f58cabac97cc811831d49a663954d2f8) |
+| Buyer joins | [Buyer A](https://testnet.mirrornode.hedera.com/api/v1/contracts/results/0x82aaa89b39240f6f1e84d004f3f26447da866344a5bc0ec0cb58aa9834307caf) · [Buyer B](https://testnet.mirrornode.hedera.com/api/v1/contracts/results/0x46af72679202cabc0ad239da314633b8e889b52c7b7eb8a5350c4dd9a9e25ee9) |
+| Offer 4 activation | [Transaction](https://testnet.mirrornode.hedera.com/api/v1/contracts/results/0x34377b1300ff6df87296a5dfa4eb96d617f05aeb87d71f603156acefac32762c) |
+| HCS topic `0.0.10776777`, sequence `3` | [Public message](https://testnet.mirrornode.hedera.com/api/v1/topics/0.0.10776777/messages/3) |
+| Buyer acceptances | [Buyer A](https://testnet.mirrornode.hedera.com/api/v1/contracts/results/0xee158117c478df1a9d378ba2cc9a723411f46e16c0bfbb9d7bd8a6e878d62fe5) · [Buyer B](https://testnet.mirrornode.hedera.com/api/v1/contracts/results/0x8f9281835800858d9074464115a961cfb1d9dce862b6f79d10c745692c732b93) |
+| Expired-order refund, offer 1 | [Transaction](https://testnet.mirrornode.hedera.com/api/v1/contracts/results/0xf137ff047a3a7981c709d522803ccac28cd7ddf777e1cd5529635d00262b9bf4) |
 
-The full-plan digest was recomputed locally and matched the published
-record retrieved from the mirror node.
+The HCS record references the activation transaction and commits to the private signed plan with digest `0x1e4e5e467895852106e1fc3b50d5198c1f78896846d3820ecd3504e1c0112793`. A read-only testnet check confirmed successful activation and two delivered, accepted, resolved orders.
 
-Delivery commitments:
-- Buyer A: 0xfe4d2f48f85f449c9464c6acea11514a9728360964cb675908d9726253b0545c
-- Buyer B: 0x6fbba110d413db12fc7b86ca358632cf6fd1c181abdec803f88ef16bdf07364d
+Each offer 4 acceptance paid the provider **1.92817547 HBAR** and returned **0.19220428 HBAR** of unused deposit to the buyer, excluding fees. Both buyers redeemed one unit from the included sample provider: HTTP 200 with 99 of 100 units remaining.
 
-Acceptance transactions:
-- Buyer A: 0xee158117c478df1a9d378ba2cc9a723411f46e16c0bfbb9d7bd8a6e878d62fe5
-- Buyer B: 0x8f9281835800858d9074464115a961cfb1d9dce862b6f79d10c745692c732b93
+## Repository structure
 
-Each acceptance paid the provider 1.92817547 HBAR and returned
-0.19220428 HBAR of deposit surplus to the buyer, excluding transaction
-fees. Accepted events matched the locked dues and surplus amounts;
-both orders were accepted and resolved.
+| Package | Purpose |
+| --- | --- |
+| `packages/agent` | Matching policy, live offer checks, and signed-term validation |
+| `packages/contracts` | Escrow, Supra feed checks, deployment, and Hardhat tests |
+| `packages/provider` | Individual entitlements and sample redemption service |
+| `packages/audit` | HCS records and activation verification |
+| `packages/web` | Sidebar dashboard, local sandbox, and wallet-authorized testnet actions |
 
-Both buyers redeemed one unit through the hardened sample provider
-HTTP server, receiving HTTP 200, remaining quota 99, and
-"Hillcash sample computation 1/100".
-Redemptions were verified at 2026-10-02T08:33:54.142Z and
-2026-10-02T08:33:54.693Z respectively.
+`AGENTS.md` records implementation constraints; `.harness/` contains the feature specification and validator. The project is MIT licensed.
 
-This demonstrates the included sample provider. An independent outside
-provider remains unverified. Private tokens, signing keys, ledgers, and
-buyer request files remain outside the repository.
+The escrow has not received an independent security audit. The included provider demonstrates the workflow, but an independent external provider, independently verified market savings, long-term service reliability, and production dispute handling remain unverified. Use **testnet HBAR only**.
