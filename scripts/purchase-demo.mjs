@@ -80,11 +80,9 @@ export async function runPurchaseDemo({
   mkdirSync(directory, { recursive: false, mode: 0o700 });
 
   const write = (name, data) =>
-    writeFileSync(
-      join(directory, name),
-      JSON.stringify(data, null, 2) + "\n",
-      { mode: 0o600 },
-    );
+    writeFileSync(join(directory, name), JSON.stringify(data, null, 2) + "\n", {
+      mode: 0o600,
+    });
 
   const evidence = {
     contract: await contract.getAddress(),
@@ -121,8 +119,7 @@ export async function runPurchaseDemo({
   const findEvent = (receipt, name) =>
     receipt.logs
       .filter(
-        (log) =>
-          log.address.toLowerCase() === evidence.contract.toLowerCase(),
+        (log) => log.address.toLowerCase() === evidence.contract.toLowerCase(),
       )
       .map((log) => {
         try {
@@ -159,9 +156,7 @@ export async function runPurchaseDemo({
         deliveryDeadline,
       ]);
 
-      const offerId = Number(
-        findEvent(receipt, "OfferCreated")?.args.offerId,
-      );
+      const offerId = Number(findEvent(receipt, "OfferCreated")?.args.offerId);
 
       assert(
         Number.isSafeInteger(offerId) && offerId > 0,
@@ -229,11 +224,7 @@ export async function runPurchaseDemo({
       2,
       "Agent did not select the cheaper offer",
     );
-    assert.equal(
-      proposal.buyerIds.length,
-      2,
-      "Both buyers must be included",
-    );
+    assert.equal(proposal.buyerIds.length, 2, "Both buyers must be included");
 
     write("plan.json", plan);
     evidence.offerId = proposal.offerId;
@@ -246,17 +237,14 @@ export async function runPurchaseDemo({
 
     for (const buyer of buyers) {
       const quote = await contract.quoteWei(2);
-      const deposit =
-        ((quote + quote / 10n + unit - 1n) / unit) * unit;
+      const deposit = ((quote + quote / 10n + unit - 1n) / unit) * unit;
 
       await transact(buyer, "join", [proposal.offerId, 5, 300], {
         value: deposit,
       });
     }
 
-    const activation = await transact(seller, "activate", [
-      proposal.offerId,
-    ]);
+    const activation = await transact(seller, "activate", [proposal.offerId]);
 
     evidence.activationTransaction = activation.hash;
 
@@ -302,15 +290,16 @@ export async function runPurchaseDemo({
         "Token commitment mismatch",
       );
 
-      const receipt = await transact(buyers[index], "accept", [proposal.offerId], { gasLimit: 250_000n });
+      const receipt = await transact(
+        buyers[index],
+        "accept",
+        [proposal.offerId],
+        { gasLimit: 250_000n },
+      );
       const accepted = findEvent(receipt, "Accepted");
 
       assert(accepted, "Acceptance event missing");
-      assert.equal(
-        accepted.args.paid,
-        order.due,
-        "Wrong provider payment",
-      );
+      assert.equal(accepted.args.paid, order.due, "Wrong provider payment");
       assert.equal(
         accepted.args.returned,
         order.deposited - order.due,
@@ -322,10 +311,7 @@ export async function runPurchaseDemo({
         addresses[index + 1],
       );
 
-      assert(
-        settled.accepted && settled.resolved,
-        "Order did not resolve",
-      );
+      assert(settled.accepted && settled.resolved, "Order did not resolve");
 
       evidence.settlements.push({
         buyer: `Buyer ${index + 1}`,
@@ -335,7 +321,9 @@ export async function runPurchaseDemo({
       });
     }
 
-    stage("6/7 Both buyers redeem through the actual sample provider HTTP server.");
+    stage(
+      "6/7 Both buyers redeem through the actual sample provider HTTP server.",
+    );
 
     server = createProviderServer({
       redeem: async (input) => {
@@ -360,20 +348,17 @@ export async function runPurchaseDemo({
     evidence.redemptions = [];
 
     for (let index = 0; index < buyers.length; index++) {
-      const response = await fetch(
-        `http://127.0.0.1:${port}/redeem`,
-        {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            authorization: `Bearer ${entitlements[index].token}`,
-          },
-          body: JSON.stringify({
-            offerId: proposal.offerId,
-            buyer: addresses[index + 1],
-          }),
+      const response = await fetch(`http://127.0.0.1:${port}/redeem`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${entitlements[index].token}`,
         },
-      );
+        body: JSON.stringify({
+          offerId: proposal.offerId,
+          buyer: addresses[index + 1],
+        }),
+      });
 
       assert.equal(response.status, 200, "Provider rejected redemption");
 
@@ -392,7 +377,9 @@ export async function runPurchaseDemo({
       );
     }
 
-    stage("7/7 Audit tool checks the signed plan and publishes its HCS record.");
+    stage(
+      "7/7 Audit tool checks the signed plan and publishes its HCS record.",
+    );
 
     evidence.audit = await anchor({
       plan,
@@ -434,6 +421,7 @@ async function main() {
     return;
   }
 
+  console.log("Checking testnet configuration, network, oracle, and wallet balances...");
   dotenv.config({ path: join(root, ".env") });
 
   for (const name of [
@@ -447,19 +435,12 @@ async function main() {
     );
   }
 
-  for (const name of [
-    "HEDERA_OPERATOR_ID",
-    "HILLCASH_HCS_TOPIC_ID",
-  ]) {
-    assert(
-      /^\d+\.\d+\.\d+$/.test(process.env[name] || ""),
-      `Set ${name}`,
-    );
+  for (const name of ["HEDERA_OPERATOR_ID", "HILLCASH_HCS_TOPIC_ID"]) {
+    assert(/^\d+\.\d+\.\d+$/.test(process.env[name] || ""), `Set ${name}`);
   }
 
   const rpc = new JsonRpcProvider(
-    process.env.HEDERA_TESTNET_RPC_URL ||
-      "https://testnet.hashio.io/api",
+    process.env.HEDERA_TESTNET_RPC_URL || "https://testnet.hashio.io/api",
   );
 
   try {
@@ -469,11 +450,7 @@ async function main() {
       "Only Hedera testnet is allowed",
     );
 
-    const contract = new Contract(
-      process.env.HILLCASH_CONTRACT,
-      abi,
-      rpc,
-    );
+    const contract = new Contract(process.env.HILLCASH_CONTRACT, abi, rpc);
 
     assert.notEqual(
       await rpc.getCode(await contract.getAddress()),
@@ -495,9 +472,7 @@ async function main() {
     ].map((name) => new Wallet(process.env[name], rpc));
 
     assert.equal(
-      new Set(
-        wallets.map((wallet) => wallet.address.toLowerCase()),
-      ).size,
+      new Set(wallets.map((wallet) => wallet.address.toLowerCase())).size,
       3,
       "Use three distinct wallets",
     );
@@ -506,9 +481,7 @@ async function main() {
 
     for (let index = 0; index < wallets.length; index++) {
       const required =
-        index === 0
-          ? parseEther("5")
-          : quote + quote / 10n + parseEther("1");
+        index === 0 ? parseEther("5") : quote + quote / 10n + parseEther("1");
 
       assert(
         (await rpc.getBalance(wallets[index].address)) >= required,
@@ -523,10 +496,7 @@ async function main() {
       mode: 0o700,
     });
 
-    const directory = join(
-      privateParent,
-      `purchase-${randomUUID()}`,
-    );
+    const directory = join(privateParent, `purchase-${randomUUID()}`);
 
     console.log(
       "Hedera TESTNET purchase demo. Supplied buyer keys authorize " +
@@ -537,16 +507,11 @@ async function main() {
       provider: rpc,
       contract,
       seller: new NonceManager(wallets[0]),
-      buyers: wallets
-        .slice(1)
-        .map((wallet) => new NonceManager(wallet)),
+      buyers: wallets.slice(1).map((wallet) => new NonceManager(wallet)),
       directory,
       txOptions: {
         type: 0,
-        gasPrice: BigInt(
-          process.env.HILLCASH_GAS_PRICE_WEI ||
-            "2000000000000",
-        ),
+        gasPrice: BigInt(process.env.HILLCASH_GAS_PRICE_WEI || "2000000000000"),
       },
       anchor: async ({ planFile, transactionHash }) => {
         let result;
@@ -554,13 +519,7 @@ async function main() {
         try {
           result = await runFile(
             "npm",
-            [
-              "run",
-              "audit:anchor",
-              "--",
-              planFile,
-              transactionHash,
-            ],
+            ["run", "audit:anchor", "--", planFile, transactionHash],
             {
               cwd: root,
               encoding: "utf8",
@@ -596,8 +555,9 @@ if (
   process.argv[1] &&
   resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
+  const keepAlive = setInterval(() => {}, 1000);
   main().catch((error) => {
     console.error(error.shortMessage || error.message);
     process.exitCode = 1;
-  });
+  }).finally(() => clearInterval(keepAlive));
 }
