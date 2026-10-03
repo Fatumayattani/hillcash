@@ -22,7 +22,8 @@
     "start": "npm run start -w @hillcash/web --",
     "agent:plan": "npm run plan -w @hillcash/agent --",
     "provider:terms": "npm run sign:terms -w @hillcash/provider --",
-    "format": "prettier --write . --log-level warn"
+    "format": "prettier --write . --log-level warn",
+    "demo:testnet": "node scripts/purchase-demo.mjs"
   },
   "overrides": {
     "@grpc/grpc-js": "1.13.6",
